@@ -30,6 +30,8 @@ public class PostService {
                 .map(id -> postRepository.findById(id)
                         .orElse(new Post()))
                 .orElse(new Post());
+        // not woking properly
+        // it only return the id not the json for the media
 
         post = postMapper.toEntity(postDTO);
         return postRepository.save(post).getId();
