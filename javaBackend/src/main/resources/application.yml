@@ -1,0 +1,72 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: recipe-management-app
+  datasource:
+    url: jdbc:postgresql://localhost:5432/recipe_db
+    username: postgres
+    password: password
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 5
+      idle-timeout: 600000
+      connection-timeout: 30000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+    properties:
+      hibernate:
+        format_sql: true
+        show_sql: true
+        jdbc:
+          batch_size: 50
+    open-in-view: false
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: recipe-app
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+    # -------------------------------
+    # Elasticsearch
+    # -------------------------------
+  elasticsearch:
+    uris: http://localhost:9200
+    connection-timeout: 5s
+    socket-timeout: 10s
+    username: dipeshmalla
+    password: dipeshmalla
+
+  mail:
+    host: localhost
+    port: 1025
+    username: dipeshmalla
+    password: dipeshmalla
+    properties:
+      mail:
+        smtp:
+          trust: "*"
+        auth: true
+        starttls:
+          enable: true
+        timeout: 5000
+        connectiontimeout: 5000
+        writetimeout: 5000
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 60000
