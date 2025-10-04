@@ -1,6 +1,7 @@
 package com.esewa.javabackend.module;
 
 
+import com.esewa.javabackend.enums.Role;
 import com.esewa.javabackend.module.base.AuditingEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -20,8 +21,8 @@ import java.util.*;
 public class User extends AuditingEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
     @Column(unique = true, nullable = false)
     private String username;
@@ -31,8 +32,10 @@ public class User extends AuditingEntity {
     @Column(unique = true, nullable = false)
     private String email;
 
-    @Column(nullable = false)
-    private String passwordHash;
+    @Enumerated(EnumType.STRING)
+    private Role role;
+
+    private String password;
 
     private String bio;
     private String location;
@@ -43,15 +46,19 @@ public class User extends AuditingEntity {
     @Column(columnDefinition = "TEXT")
     private String chefCredentials;
 
-    @Column(columnDefinition = "jsonb")
-    private String dietaryPreferences; // stored as JSON
+//    @Column(columnDefinition = "jsonb")
+//    private String dietaryPreferences;
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_dietary_preferences", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "preference")
+    private List<String> dietaryPreferences;
+
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_badges", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "badge")
     private List<String> badges = new ArrayList<>();
 
-    @Column(columnDefinition = "jsonb")
     private String privacySettings; // JSON
 
 

@@ -2,6 +2,7 @@ package com.esewa.javabackend.module;
 
 
 import com.esewa.javabackend.enums.ModerationStatus;
+import com.esewa.javabackend.module.base.AuditingEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -18,11 +19,11 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name = "recipes")
-public class Recipe {
+public class Recipe  extends AuditingEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    private Integer id;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "author_id")
@@ -35,6 +36,11 @@ public class Recipe {
 
     @Column(columnDefinition = "TEXT")
     private String instructions;
+
+    @ElementCollection
+    @CollectionTable(name = "recipe_ingredients", joinColumns = @JoinColumn(name = "recipe_id"))
+    @Column(name = "ingredient")
+    private List<String> ingredients;
 
     private Integer servings;
 
@@ -49,13 +55,13 @@ public class Recipe {
     @Column(name = "tag")
     private List<String> tags;
 
-    @Column(columnDefinition = "jsonb")
-    private String nutrition; // JSON string (e.g., calories, macros)
+//    @Column(columnDefinition = "jsonb")
+//    private String nutrition; // JSON string (e.g., calories, macros)
 
     @ElementCollection
     @CollectionTable(name = "recipe_media", joinColumns = @JoinColumn(name = "recipe_id"))
     @Column(name = "media_id")
-    private List<UUID> mediaIds;
+    private List<Integer> mediaIds;
 
     @Enumerated(EnumType.STRING)
     private ModerationStatus moderationStatus;

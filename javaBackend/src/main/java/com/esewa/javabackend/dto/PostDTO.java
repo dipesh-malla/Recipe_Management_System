@@ -10,9 +10,9 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class    PostDTO {
-    private UUID id;
-    private UUID authorId;
+public class PostDTO {
+    private Integer id;
+    private Integer authorId;
     private String contentText;
     private List<UUID> mediaIds;
     private String privacy;

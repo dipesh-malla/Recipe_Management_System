@@ -12,12 +12,14 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class UserDTO {
-    private UUID id;
+    private Integer id;
     private String username;
     private String displayName;
     private String email;
+    private String password;
     private boolean isChef;
     private List<String> badges;
     private boolean verified;
+    private String role;
 }
 

@@ -1,5 +1,6 @@
 package com.esewa.javabackend.module;
 
+import com.esewa.javabackend.enums.GroupRole;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

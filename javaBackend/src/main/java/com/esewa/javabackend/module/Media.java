@@ -2,6 +2,7 @@ package com.esewa.javabackend.module;
 
 import com.esewa.javabackend.enums.MediaType;
 import com.esewa.javabackend.enums.ModerationStatus;
+import com.esewa.javabackend.module.base.AuditingEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -16,7 +17,7 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name = "media")
-public class Media {
+public class Media extends AuditingEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -39,6 +40,4 @@ public class Media {
     @Enumerated(EnumType.STRING)
     private ModerationStatus moderationStatus;
 
-    @CreationTimestamp
-    private Instant createdAt;
 }

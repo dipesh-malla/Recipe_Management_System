@@ -37,7 +37,7 @@ public abstract class AuditingEntity {
     @LastModifiedBy
     private Long modifiedBy;
 
-    @Column(name="modified_by")
+    @Column(name="modified_date")
     @LastModifiedDate
     private LocalDateTime modifiedDate;
 

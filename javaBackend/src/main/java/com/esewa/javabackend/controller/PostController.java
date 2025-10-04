@@ -1,12 +1,19 @@
 package com.esewa.javabackend.controller;
 
 
-import com.esewa.javabackend.config.CustomMessageSource;
+import com.esewa.javabackend.controller.Base.BaseController;
+import com.esewa.javabackend.dto.Base.GlobalApiRequest;
 import com.esewa.javabackend.dto.Base.GlobalApiResponse;
 import com.esewa.javabackend.dto.PostDTO;
 import com.esewa.javabackend.enums.Messages;
+import com.esewa.javabackend.module.Post;
 import com.esewa.javabackend.service.PostService;
+import com.esewa.javabackend.utils.ApiConstants;
+import com.esewa.javabackend.utils.AppConstants;
+import com.esewa.javabackend.utils.SearchFilter;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,54 +21,65 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/posts")
 @RequiredArgsConstructor
-public class PostController {
+public class PostController extends BaseController {
 
     private final PostService postService;
-    private final CustomMessageSource messageSource;
 
     @PostMapping
-    public GlobalApiResponse<UUID> createPost(@RequestBody PostDTO postDTO) {
-        UUID id = postService.savePost(postDTO);
-        return GlobalApiResponse.<UUID>builder()
-                .success(true)
-                .responseCode("200")
-                .message(messageSource.getMessage(Messages.SUCCESS.getCode()))
-                .data(id)
-                .build();
-    }
-
-    @GetMapping
-    public GlobalApiResponse<List<PostDTO>> getAllPosts(@RequestParam(defaultValue = "0") int page,
-                                                        @RequestParam(defaultValue = "10") int size) {
-        List<PostDTO> posts = postService.getAllPosts(page, size);
-        return GlobalApiResponse.<List<PostDTO>>builder()
-                .success(true)
-                .responseCode("200")
-                .message(messageSource.getMessage(Messages.SUCCESS.getCode()))
-                .data(posts)
-                .build();
+    public ResponseEntity<GlobalApiResponse<Integer>> savePost(
+            @RequestBody @Valid GlobalApiRequest<PostDTO> postReq
+            ) {
+        return ResponseEntity.ok(
+                successResponse(
+                        postService.savePost(postReq.getData()),
+                        Messages.SUCCESS,
+                        "Post saved"
+                )
+        );
     }
 
     @GetMapping("/{id}")
-    public GlobalApiResponse<PostDTO> getPostById(@PathVariable UUID id) {
-        PostDTO postDTO = postService.getPostById(id);
-        return GlobalApiResponse.<PostDTO>builder()
-                .success(true)
-                .responseCode("200")
-                .message(messageSource.getMessage(Messages.SUCCESS.getCode()))
-                .data(postDTO)
-                .build();
+    public ResponseEntity<GlobalApiResponse<?>> getPostById(
+            @PathVariable Integer id
+            ) {
+        return ResponseEntity.ok(
+                successResponse(
+                        postService.getPostById(id),
+                        Messages.SUCCESS,
+                        "Post fetched"
+                )
+        );
     }
 
-    @DeleteMapping("/{id}")
-    public GlobalApiResponse<Boolean> deletePost(@PathVariable UUID id) {
-        boolean deleted = postService.deletePost(id);
-        return GlobalApiResponse.<Boolean>builder()
-                .success(deleted)
-                .responseCode("200")
-                .message(deleted ? messageSource.getMessage(Messages.SUCCESS.getCode()) : "Failed")
-                .data(deleted)
-                .build();
+    @GetMapping("/filter")
+    public ResponseEntity<GlobalApiResponse<?>> getAllPosts(
+            @RequestBody @Valid GlobalApiRequest<SearchFilter> filterReq
+            ) {
+        return ResponseEntity.ok(
+                successResponse(
+                        postService.getAllPosts(filterReq.getData()),
+                        Messages.SUCCESS,
+                        "Posts fetched"
+                )
+        );
     }
+
+    @GetMapping
+    public ResponseEntity<List<Post>> getAllPosts(){
+        return ResponseEntity.ok(postService.fetchAllPosts());
+    }
+
+//    @PostMapping(ApiConstants.Generic.TOGGLE_DATA)
+//    public ResponseEntity<GlobalApiResponse<?>> togglePost(
+//            @RequestBody @Valid GlobalApiRequest<IDRequest> idRequest
+//            ) {
+//        return ResponseEntity.ok(
+//                successResponse(
+//                        postService.togglePost(idRequest.getData().getId()),
+//                        Messages.SUCCESS,
+//                        "Post deleted"
+//                )
+//        );
+//    }
 }
 

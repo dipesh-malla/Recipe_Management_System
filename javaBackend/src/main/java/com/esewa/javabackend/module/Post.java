@@ -22,8 +22,8 @@ import java.util.UUID;
 public class Post extends AuditingEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    private Integer id;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "author_id")
@@ -32,7 +32,7 @@ public class Post extends AuditingEntity {
     @Column(columnDefinition = "TEXT")
     private String contentText;
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "post_media", joinColumns = @JoinColumn(name = "post_id"))
     @Column(name = "media_id")
     private List<UUID> mediaIds;  // store reference IDs of media
@@ -41,7 +41,6 @@ public class Post extends AuditingEntity {
     private Privacy privacy;
 
     private boolean pinned;
-
 }
 
 
