@@ -1,7 +1,9 @@
 package com.esewa.javabackend.service;
 
 import com.esewa.javabackend.dto.Base.response.PaginatedDtoResponse;
-import com.esewa.javabackend.dto.UserDTO.UserDTO;
+import com.esewa.javabackend.dto.UserDTO.UserProfileDTO;
+import com.esewa.javabackend.dto.UserDTO.UserRequestDTO;
+import com.esewa.javabackend.dto.UserDTO.UserResponseDTO;
 import com.esewa.javabackend.mapper.UserMapper;
 import com.esewa.javabackend.module.User;
 import com.esewa.javabackend.repository.JpaRepository.UserRepository;
@@ -18,10 +20,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 @Transactional
@@ -34,7 +36,7 @@ public class UserService {
     private final String className = this.getClass().getName();
 
     // Create / Update
-    public Integer saveUser(UserDTO userDTO) {
+    public Integer saveUser(UserRequestDTO userDTO) {
         log.info( className, AppUtil.getMethodName(), AppConstants.REQUEST, userDTO);
 
         User user = Optional.ofNullable(userDTO.getId())
@@ -51,7 +53,7 @@ public class UserService {
 
     @Transactional
     // Read by ID
-    public UserDTO getUserById(Integer id) {
+    public UserResponseDTO getUserById(Integer id) {
         log.info( className, AppUtil.getMethodName(), AppConstants.REQUEST, id);
 
         return userRepository.findById(id)
@@ -69,7 +71,7 @@ public class UserService {
     }
 
     // Filter / Paginated fetch
-    public PaginatedDtoResponse<UserDTO> getAllUsers(SearchFilter filter) {
+    public PaginatedDtoResponse<UserResponseDTO> getAllUsers(SearchFilter filter) {
         log.info( className, AppUtil.getMethodName(), AppConstants.REQUEST, filter);
 
         PageRequest pageable = PageRequest.of(
@@ -79,14 +81,28 @@ public class UserService {
         );
 
         Page<User> users = userRepository.findAll(UserSpecification.buildSpecification(filter), pageable);
-        Page<UserDTO> dtoPage = users.map(userMapper::toDTO);
+        Page<UserResponseDTO> dtoPage = users.map(userMapper::toDTO);
 
         return PaginatedResHandler.getPaginatedData(dtoPage);
     }
 
     @Transactional
-    public List<User> getAllUser() {
-        return userRepository.findAll();
+    public List<UserResponseDTO> getAllUsers() {
+        return userRepository.findAll()
+                .stream()
+                .map(userMapper::toDTO) // map entity -> DTO
+                .toList();
     }
+
+
+//    @Transactional
+//    public Integer updateUserProfile(UserProfileDTO profileDTO, MultipartFile file) {
+//        User user = userRepository.findById(profileDTO.getId())
+//                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+//
+//        userMapper.updateProfile(profileDTO, user);
+//        return userRepository.save(user).getId();
+//    }
+
 }
 

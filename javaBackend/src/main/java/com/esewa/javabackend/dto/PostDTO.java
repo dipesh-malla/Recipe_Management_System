@@ -14,7 +14,7 @@ public class PostDTO {
     private Integer id;
     private Integer authorId;
     private String contentText;
-    private List<UUID> mediaIds;
+    private List<MediaDTO> mediaIds;
     private String privacy;
     private boolean pinned;
 }

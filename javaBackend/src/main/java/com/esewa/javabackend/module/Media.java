@@ -20,12 +20,16 @@ import java.util.UUID;
 public class Media extends AuditingEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    private Integer id;
 
-    @ManyToOne(optional = false)
+    @OneToOne
     @JoinColumn(name = "owner_id")
     private User owner;
+
+    @ManyToOne
+    @JoinColumn(name = "post_id")
+    private Post post;
 
     @Enumerated(EnumType.STRING)
     private MediaType type;
@@ -33,9 +37,6 @@ public class Media extends AuditingEntity {
     private String url;
 
     private String thumbnailUrl;
-
-    @Column(columnDefinition = "jsonb")
-    private String metadata; // JSON with size, dimensions, etc.
 
     @Enumerated(EnumType.STRING)
     private ModerationStatus moderationStatus;

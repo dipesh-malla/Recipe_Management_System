@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8090
 spring:
   application:
     name: recipe-management-app
@@ -17,7 +17,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     properties:
       hibernate:
         format_sql: true

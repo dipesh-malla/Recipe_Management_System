@@ -1,22 +1,26 @@
 package com.esewa.javabackend.mapper;
 
-import com.esewa.javabackend.dto.PostDTO;
-import com.esewa.javabackend.dto.UserDTO.UserDTO;
-import com.esewa.javabackend.module.Post;
+import com.esewa.javabackend.dto.UserDTO.UserProfileDTO;
+import com.esewa.javabackend.dto.UserDTO.UserRequestDTO;
+import com.esewa.javabackend.dto.UserDTO.UserResponseDTO;
 import com.esewa.javabackend.module.User;
 import org.mapstruct.*;
-import org.mapstruct.factory.Mappers;
 
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", uses = {MediaMapper.class})
 public interface UserMapper {
 
     @Mapping(source = "id", target = "id")
-    UserDTO toDTO(User user);
+    @Mapping(target = "profile.id", source = "profile.id")
+    @Mapping(target = "profile.url", source = "profile.url")
+    @Mapping(target = "profile.type", source = "profile.type")
+    UserResponseDTO toDTO(User user);
 
     @Mapping(source = "id", target = "id")
-    User toEntity(UserDTO userDTO);
+    User toEntity(UserRequestDTO userDTO);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    void updateEntity(UserDTO dto, @MappingTarget User entity);
+    void updateEntity(UserRequestDTO dto, @MappingTarget User entity);
+    void updateProfile(UserProfileDTO dto, @MappingTarget User entity);
+
 }

@@ -3,10 +3,16 @@ package com.esewa.javabackend.service;
 
 import com.esewa.javabackend.config.CustomMessageSource;
 import com.esewa.javabackend.dto.Base.response.PaginatedDtoResponse;
+import com.esewa.javabackend.dto.CommentDTO;
 import com.esewa.javabackend.dto.PostDTO;
+import com.esewa.javabackend.dto.postDTO.PostResponseDTO;
+import com.esewa.javabackend.enums.MediaType;
 import com.esewa.javabackend.enums.Messages;
+import com.esewa.javabackend.enums.ModerationStatus;
 import com.esewa.javabackend.mapper.PostMapper;
+import com.esewa.javabackend.module.Media;
 import com.esewa.javabackend.module.Post;
+import com.esewa.javabackend.repository.JpaRepository.MediaRepository;
 import com.esewa.javabackend.repository.JpaRepository.PostRepository;
 import com.esewa.javabackend.repository.JpaRepository.UserRepository;
 import com.esewa.javabackend.utils.AppConstants;
@@ -22,10 +28,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -34,74 +39,154 @@ public class PostService {
 
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final MediaRepository mediaRepository;
     private final PostMapper postMapper;
+    private final FileStorageService fileStorageService;
     private final CustomMessageSource messageSource;
+
     private final String className = this.getClass().getName();
 
+    /**
+     * Save or update post with optional media files
+     */
     @Transactional
-    public Integer savePost(PostDTO postDTO) {
-        log.info( className, AppUtil.getMethodName(), AppConstants.REQUEST, postDTO);
+    public Integer savePostWithMedia(PostDTO postDTO, List<MultipartFile> files) {
+        log.info("{} - {} - Request: {}", className, AppUtil.getMethodName(), postDTO);
+
         if (postDTO == null) {
             throw new IllegalArgumentException("PostDTO cannot be null");
         }
+
         Post post = Optional.ofNullable(postDTO.getId())
                 .map(id -> postRepository.findById(id)
-                        .orElseThrow(() -> new ResourceNotFoundException(messageSource.getMessage(Messages.NOT_FOUND.getCode(), "Post"))))
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                messageSource.getMessage("post.not.found", "Post"))))
                 .orElseGet(Post::new);
 
-        // set author
+        // Set author
         if (post.getId() == null && postDTO.getAuthorId() != null) {
             post.setAuthor(userRepository.findById(postDTO.getAuthorId())
                     .orElseThrow(() -> new ResourceNotFoundException(
-                            messageSource.getMessage(Messages.NOT_FOUND.getCode(), "User"))));
+                            messageSource.getMessage("user.not.found", "User"))));
         }
 
-        Post mappedPost = postMapper.toEntity(postDTO);
-        mappedPost.setAuthor(post.getAuthor()); // preserve already set author
+        // Update post fields
+        postMapper.updatePostFromDTO(postDTO, post);
 
-        return postRepository.save(mappedPost).getId();
+        // Save post to get ID
+        post = postRepository.save(post);
+
+        // Handle media uploads
+        if (files != null && !files.isEmpty()) {
+            List<Media> mediaList = new ArrayList<>();
+            for (MultipartFile file : files) {
+                String folder = Objects.requireNonNull(file.getContentType()).startsWith("image/") ? "post/image" : "post/video";
+                String fileUrl = fileStorageService.upload(file, folder);
+
+                Media media = Media.builder()
+                        .post(post)
+                        .owner(post.getAuthor())
+                        .type(file.getContentType().startsWith("image/") ? MediaType.IMAGE : MediaType.VIDEO)
+                        .url(fileUrl)
+                        .moderationStatus(ModerationStatus.APPROVED)
+                        .build();
+
+                mediaList.add(media);
+            }
+            mediaRepository.saveAll(mediaList);
+            post.setMedias(mediaList);
+        }
+
+        return post.getId();
     }
 
-    public PostDTO getPostById(Integer id) {
-        log.info( className, AppUtil.getMethodName(), AppConstants.REQUEST, id);
+    /**
+     * Fetch post by ID
+     */
+    @Transactional
+    public PostResponseDTO getPostById(Integer id) {
+        log.info("{} - {} - Request ID: {}", className, AppUtil.getMethodName(), id);
         return postRepository.findById(id)
-                .map(postMapper::toDTO)
-                .orElseThrow(() -> new ResourceNotFoundException(messageSource.getMessage(Messages.NOT_FOUND.getCode(), "Post")));
+                .map(postMapper::toResponseDTO)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageSource.getMessage("post.not.found", "Post")));
     }
 
-    public PaginatedDtoResponse<PostDTO> getAllPosts(SearchFilter filter) {
-        log.info( className, AppUtil.getMethodName(), AppConstants.REQUEST, filter);
+    /**
+     * Fetch post as PostResponseDTO
+     */
+    @Transactional
+    public PostResponseDTO getPostResponseById(Integer id) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        messageSource.getMessage(Messages.NOT_FOUND.getCode(), "Post")));
+        return postMapper.toResponseDTO(post);
+    }
 
-        // Build Pageable from filter
+    /**
+     * Fetch all posts for frontend (non-paginated)
+     */
+    @Transactional
+    public List<PostResponseDTO> fetchAllPosts() {
+        List<Post> posts = postRepository.findAll();
+        return posts.stream()
+                .map(postMapper::toResponseDTO)
+                .toList();
+    }
+
+    /**
+     * Paginated and filtered post list
+     */
+    @Transactional
+    public PaginatedDtoResponse<PostDTO> getAllPosts(SearchFilter filter) {
+        log.info("{} - {} - Request filter: {}", className, AppUtil.getMethodName(), filter);
+
+        if (filter == null || filter.getPagination() == null) {
+            log.warn("{} - {} - Invalid filter or pagination info", className, AppUtil.getMethodName());
+            return PaginatedDtoResponse.<PostDTO>builder()
+                    .data(Collections.emptyList())
+                    .totalElements(0L)
+                    .totalPages(0)
+                    .build();
+        }
+
+        // Build pageable object
         PageRequest pageable = PageRequest.of(
                 filter.getPagination().getPage(),
                 filter.getPagination().getSize(),
                 Sort.by(Sort.Direction.fromString(filter.getSortOrder()), filter.getSortBy())
         );
 
-        // Fetch paginated posts
-        Page<Post> postsPage = postRepository.findAll(PostSpecification.buildSpecification(filter),pageable);
+        // Fetch paginated posts with specifications
+        Page<Post> postsPage = postRepository.findAll(PostSpecification.buildSpecification(filter), pageable);
 
-        // Convert entities -> DTO
+        if (postsPage.isEmpty()) {
+            log.info("{} - {} - No posts found", className, AppUtil.getMethodName());
+            return PaginatedDtoResponse.<PostDTO>builder()
+                    .data(Collections.emptyList())
+                    .totalElements(0L)
+                    .totalPages(0)
+                    .build();
+        }
+
+        // Map to DTO
         Page<PostDTO> dtoPage = postsPage.map(postMapper::toDTO);
 
-        // Convert to your PaginatedDtoResponse
         return PaginatedResHandler.getPaginatedData(dtoPage);
     }
 
-    public Boolean togglePost(Integer id) {
-        log.info( className, AppUtil.getMethodName(), AppConstants.REQUEST, id);
+    /**
+     * Delete post by ID
+     */
+    @Transactional
+    public Boolean deletePost(Integer id) {
+        log.info("{} - {} - Delete request ID: {}", className, AppUtil.getMethodName(), id);
         try {
             postRepository.deleteById(id);
             return true;
         } catch (Exception e) {
-            log.error(className, AppUtil.getMethodName(), e.getMessage(), id);
+            log.error("{} - {} - Error deleting post: {}", className, AppUtil.getMethodName(), e.getMessage());
             return false;
         }
-    }
-
-    public List<Post> fetchAllPosts() {
-        log.info( className, AppUtil.getMethodName(), AppConstants.REQUEST);
-        return postRepository.findAll();
     }
 }

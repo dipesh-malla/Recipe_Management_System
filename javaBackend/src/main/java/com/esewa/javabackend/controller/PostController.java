@@ -5,19 +5,21 @@ import com.esewa.javabackend.controller.Base.BaseController;
 import com.esewa.javabackend.dto.Base.GlobalApiRequest;
 import com.esewa.javabackend.dto.Base.GlobalApiResponse;
 import com.esewa.javabackend.dto.PostDTO;
+import com.esewa.javabackend.dto.postDTO.PostResponseDTO;
 import com.esewa.javabackend.enums.Messages;
 import com.esewa.javabackend.module.Post;
 import com.esewa.javabackend.service.PostService;
-import com.esewa.javabackend.utils.ApiConstants;
-import com.esewa.javabackend.utils.AppConstants;
 import com.esewa.javabackend.utils.SearchFilter;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.UUID;
 @RestController
 @RequestMapping("/api/posts")
 @RequiredArgsConstructor
@@ -25,13 +27,21 @@ public class PostController extends BaseController {
 
     private final PostService postService;
 
-    @PostMapping
+    /**
+     * Create/Update post with media
+     * Multipart: profile/post images/videos
+     */
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<GlobalApiResponse<Integer>> savePost(
-            @RequestBody @Valid GlobalApiRequest<PostDTO> postReq
-            ) {
+            @RequestPart("post") String postJson,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files
+    ) throws JsonProcessingException {
+
+        PostDTO postDTO = new ObjectMapper().readValue(postJson, PostDTO.class);
+
         return ResponseEntity.ok(
                 successResponse(
-                        postService.savePost(postReq.getData()),
+                        postService.savePostWithMedia(postDTO, files),
                         Messages.SUCCESS,
                         "Post saved"
                 )
@@ -39,47 +49,22 @@ public class PostController extends BaseController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<GlobalApiResponse<?>> getPostById(
-            @PathVariable Integer id
-            ) {
+    public ResponseEntity<GlobalApiResponse<PostResponseDTO>> getPostById(@PathVariable Integer id) {
         return ResponseEntity.ok(
                 successResponse(
-                        postService.getPostById(id),
+                        postService.getPostResponseById(id),
                         Messages.SUCCESS,
                         "Post fetched"
                 )
         );
     }
 
-    @GetMapping("/filter")
-    public ResponseEntity<GlobalApiResponse<?>> getAllPosts(
-            @RequestBody @Valid GlobalApiRequest<SearchFilter> filterReq
-            ) {
-        return ResponseEntity.ok(
-                successResponse(
-                        postService.getAllPosts(filterReq.getData()),
-                        Messages.SUCCESS,
-                        "Posts fetched"
-                )
-        );
-    }
-
     @GetMapping
-    public ResponseEntity<List<Post>> getAllPosts(){
-        return ResponseEntity.ok(postService.fetchAllPosts());
+    public ResponseEntity<GlobalApiResponse<List<PostResponseDTO>>> getAllPosts() {
+        return ResponseEntity.ok(successResponse(
+                postService.fetchAllPosts(),
+                Messages.SUCCESS,
+                "All posts fetched"
+        ));
     }
-
-//    @PostMapping(ApiConstants.Generic.TOGGLE_DATA)
-//    public ResponseEntity<GlobalApiResponse<?>> togglePost(
-//            @RequestBody @Valid GlobalApiRequest<IDRequest> idRequest
-//            ) {
-//        return ResponseEntity.ok(
-//                successResponse(
-//                        postService.togglePost(idRequest.getData().getId()),
-//                        Messages.SUCCESS,
-//                        "Post deleted"
-//                )
-//        );
-//    }
 }
-

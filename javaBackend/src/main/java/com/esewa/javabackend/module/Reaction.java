@@ -2,13 +2,11 @@ package com.esewa.javabackend.module;
 
 
 import com.esewa.javabackend.enums.ReactionType;
-import com.esewa.javabackend.enums.ResourceType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
-import java.util.UUID;
 
 @Getter
 @Setter
@@ -21,15 +19,12 @@ import java.util.UUID;
 public class Reaction {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    private Integer id;
 
-    @Enumerated(EnumType.STRING)
-    private ResourceType resourceType;
-
-
-
-    private UUID resourceId;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "post_id")
+    private Post post;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "user_id")

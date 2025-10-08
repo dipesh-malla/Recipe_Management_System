@@ -2,6 +2,7 @@ package com.esewa.javabackend.dto;
 
 import lombok.*;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Getter
@@ -10,9 +11,8 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class ReactionDTO {
-    private UUID id;
-    private String resourceType;
-    private UUID resourceId;
-    private UUID userId;
+    private Integer id;
+    private Integer postId;
+    private Integer userId;
     private String type;
 }

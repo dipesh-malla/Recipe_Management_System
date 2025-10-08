@@ -18,7 +18,7 @@ public class UserSpecification {
             // free-text search across multiple fields
             if (filter.getSearchValue() != null && !filter.getSearchValue().isEmpty()) {
                 String likePattern = "%" + filter.getSearchValue().toLowerCase() + "%";
-                Predicate namePredicate = cb.like(cb.lower(root.get("name")), likePattern);
+                Predicate namePredicate = cb.like(cb.lower(root.get("username")), likePattern);
                 Predicate emailPredicate = cb.like(cb.lower(root.get("email")), likePattern);
                 predicates.add(cb.or(namePredicate, emailPredicate));
             }

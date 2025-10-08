@@ -9,6 +9,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -53,7 +54,7 @@ public class Recipe  extends AuditingEntity {
     @ElementCollection
     @CollectionTable(name = "recipe_tags", joinColumns = @JoinColumn(name = "recipe_id"))
     @Column(name = "tag")
-    private List<String> tags;
+    private List<String> tags = new ArrayList<>();
 
 //    @Column(columnDefinition = "jsonb")
 //    private String nutrition; // JSON string (e.g., calories, macros)
@@ -61,7 +62,7 @@ public class Recipe  extends AuditingEntity {
     @ElementCollection
     @CollectionTable(name = "recipe_media", joinColumns = @JoinColumn(name = "recipe_id"))
     @Column(name = "media_id")
-    private List<Integer> mediaIds;
+    private List<Integer> mediaIds =  new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     private ModerationStatus moderationStatus;

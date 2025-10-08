@@ -3,14 +3,14 @@ package com.esewa.javabackend.module;
 
 import com.esewa.javabackend.enums.Privacy;
 import com.esewa.javabackend.module.base.AuditingEntity;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Getter
 @Setter
@@ -32,15 +32,19 @@ public class Post extends AuditingEntity {
     @Column(columnDefinition = "TEXT")
     private String contentText;
 
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "post_media", joinColumns = @JoinColumn(name = "post_id"))
-    @Column(name = "media_id")
-    private List<UUID> mediaIds;  // store reference IDs of media
+    @OneToMany(mappedBy = "post", cascade =  CascadeType.ALL)
+    private List<Media> medias = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     private Privacy privacy;
 
     private boolean pinned;
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Comment> comments = new HashSet<>();
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Reaction> reactions = new HashSet<>();
 }
 
 

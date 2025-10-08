@@ -7,9 +7,10 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserCreateDTO {
+public class UserRequestDTO {
+    private Integer id;
     private String username;
+    private String displayName;
     private String email;
     private String password;
-    private boolean isChef;
 }

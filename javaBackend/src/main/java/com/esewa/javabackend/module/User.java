@@ -1,6 +1,7 @@
 package com.esewa.javabackend.module;
 
 
+import com.esewa.javabackend.enums.Privacy;
 import com.esewa.javabackend.enums.Role;
 import com.esewa.javabackend.module.base.AuditingEntity;
 import jakarta.persistence.*;
@@ -39,12 +40,8 @@ public class User extends AuditingEntity {
 
     private String bio;
     private String location;
-    private String website;
 
     private boolean isChef;
-
-    @Column(columnDefinition = "TEXT")
-    private String chefCredentials;
 
 //    @Column(columnDefinition = "jsonb")
 //    private String dietaryPreferences;
@@ -52,18 +49,27 @@ public class User extends AuditingEntity {
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_dietary_preferences", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "preference")
-    private List<String> dietaryPreferences;
+    private List<String> dietaryPreferences = new ArrayList<>();
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_badges", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "badge")
     private List<String> badges = new ArrayList<>();
 
-    private String privacySettings; // JSON
+    @Enumerated(EnumType.STRING)
+    private Privacy privacySettings;
 
 
     @UpdateTimestamp
     private Instant lastActiveAt;
 
     private boolean verified;
+
+    @OneToMany(mappedBy = "author")
+    private List<Post> posts = new ArrayList<>();
+
+    @OneToOne(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Media profile;
+
+
 }

@@ -1,36 +1,37 @@
 package com.esewa.javabackend.module;
 
 
+import com.esewa.javabackend.module.base.AuditingEntity;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
-import org.apache.kafka.common.resource.ResourceType;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import lombok.experimental.SuperBuilder;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.Instant;
-import java.util.UUID;
+import java.util.List;
+import java.util.Set;
+
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @Entity
 @Table(name = "comments")
-public class Comment {
+@SuperBuilder
+@EntityListeners(AuditingEntityListener.class)
+public class Comment extends AuditingEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    private Integer id;
 
     @ManyToOne
     @JoinColumn(name = "parent_id")
     private Comment parent; // nullable for root-level comment
 
-    @Enumerated(EnumType.STRING)
-    private ResourceType resourceType;
-
-    private UUID resourceId; // ID of Post or Recipe
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Comment> replies;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "author_id")
@@ -39,12 +40,10 @@ public class Comment {
     @Column(columnDefinition = "TEXT")
     private String body;
 
-    @CreationTimestamp
-    private Instant createdAt;
-
-    @UpdateTimestamp
-    private Instant editedAt;
-
     private boolean deletedFlag = false;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "post_id")
+    private Post post;
 }
 
