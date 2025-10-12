@@ -2,8 +2,8 @@ package com.esewa.javabackend.dto;
 
 import lombok.*;
 
-import java.util.List;
-import java.util.UUID;
+
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -11,9 +11,15 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class MessageDTO {
-    private UUID id;
-    private UUID conversationId;
-    private UUID senderId;
+    private Integer id;
+    private Integer conversationId;
+    private Integer senderId;
+    private String senderName;
+    private Integer receiverId;
     private String body;
-    private List<UUID> mediaIds;
+    private Instant sentAt;
+    private boolean isRead;
 }
+
+
+

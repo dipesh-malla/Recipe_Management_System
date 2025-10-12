@@ -1,8 +1,15 @@
 package com.esewa.javabackend.service;
 
+import com.esewa.javabackend.config.kafka.InteractionProducer;
+import com.esewa.javabackend.config.kafka.NotificationProducer;
 import com.esewa.javabackend.dto.CommentDTO;
+import com.esewa.javabackend.dto.event.InteractionEvent;
+import com.esewa.javabackend.dto.event.NotificationEvent;
 import com.esewa.javabackend.dto.ReactionDTO;
+import com.esewa.javabackend.enums.InteractionAction;
+import com.esewa.javabackend.enums.NotificationType;
 import com.esewa.javabackend.enums.ReactionType;
+import com.esewa.javabackend.enums.ResourceType;
 import com.esewa.javabackend.mapper.CommentMapper;
 import com.esewa.javabackend.module.Comment;
 import com.esewa.javabackend.module.Post;
@@ -12,6 +19,7 @@ import com.esewa.javabackend.repository.JpaRepository.CommentRepository;
 import com.esewa.javabackend.repository.JpaRepository.PostRepository;
 import com.esewa.javabackend.repository.JpaRepository.ReactionRepository;
 import com.esewa.javabackend.repository.JpaRepository.UserRepository;
+import com.esewa.javabackend.service.AIML.InteractionService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.common.errors.ResourceNotFoundException;
@@ -31,6 +39,11 @@ public class CommentReactionService {
     private final ReactionRepository reactionRepository;
     private final UserRepository userRepository;
     private final CommentMapper commentMapper;
+    private final NotificationProducer notificationProducer;
+    private final InteractionService  interactionService;
+    private final InteractionProducer interactionProducer;
+
+
     @Transactional
     public CommentDTO addComment(CommentDTO commentDTO) {
         Post post = postRepository.findById(commentDTO.getPostId())
@@ -39,25 +52,51 @@ public class CommentReactionService {
         User author = userRepository.findById(commentDTO.getAuthorId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-//        Comment comment = Comment.builder()
-//                .post(post)
-//                .author(author)
-//                .body(commentDTO.getBody())
-//                .build();
-       Comment comment =  commentMapper.toEntity(commentDTO);
-
+        Comment comment = commentMapper.toEntity(commentDTO);
         comment.setPost(post);
         comment.setAuthor(author);
 
         if (commentDTO.getParentId() != null) {
             Comment parent = commentRepository.findById(commentDTO.getParentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Parent comment not found"));
-            comment.setParent(parent);
+            comment.setParent(parent); // Only set parent, do not add to parent's replies
         }
 
         comment = commentRepository.save(comment);
+
+
+           if (!author.getId().equals(post.getAuthor().getId())) {
+            notificationProducer.sendNotification(NotificationEvent.builder()
+                    .senderId(author.getId())
+                    .receiverId(post.getAuthor().getId())
+                    .type(NotificationType.POST_COMMENT)
+                    .message(author.getUsername() + " commented on your post")
+                    .referenceId(post.getId())
+                    .build());
+        }
+
+//        interactionService.logInteraction(
+//                author,
+//                ResourceType.POST,
+//                post.getId(),
+//                InteractionAction.COMMENT,
+//                1.0);
+
+        interactionProducer.sendInteraction(
+                InteractionEvent.builder()
+                        .userId(author.getId())
+                        .resourceType(ResourceType.POST)
+                        .resourceId(post.getId())
+                        .action(InteractionAction.COMMENT)
+                        .value(3.0)
+                        .build()
+        );
+
+
+
         return commentMapper.toDTO(comment);
     }
+
 
     @Transactional
     public ReactionDTO addReaction(ReactionDTO reactionDTO) {
@@ -79,6 +118,33 @@ public class CommentReactionService {
         reaction.setType(ReactionType.valueOf(reactionDTO.getType()));
         reaction = reactionRepository.save(reaction);
 
+        if (!user.getId().equals(post.getAuthor().getId())) {
+            notificationProducer.sendNotification(NotificationEvent.builder()
+                    .senderId(user.getId())
+                    .receiverId(post.getAuthor().getId())
+                    .type(NotificationType.POST_REACTION)
+                    .message(user.getUsername() + " " + reactionDTO.getType().toLowerCase() + "d your post")
+                    .referenceId(post.getId())
+                    .build());
+        }
+//        interactionService.logInteraction(
+//                user,
+//                ResourceType.POST,
+//                reactionDTO.getPostId(),
+//                InteractionAction.CLICK,
+//                1.0
+//        );
+
+        interactionProducer.sendInteraction(
+                InteractionEvent.builder()
+                        .userId(user.getId())
+                        .resourceType(ResourceType.POST)
+                        .resourceId(post.getId())
+                        .action(InteractionAction.LIKE)
+                        .value(2.0)
+                        .build()
+        );
+
         reactionDTO.setId(reaction.getId());
         return reactionDTO;
     }
@@ -86,7 +152,7 @@ public class CommentReactionService {
 
     @Transactional
     public List<CommentDTO> getCommentsByPost(Integer postId) {
-        List<Comment> rootComments = commentRepository.findByPostIdAndParentIsNull(postId, Sort.by(Sort.Direction.ASC, "createdAt"));
+        List<Comment> rootComments = commentRepository.findByPostIdAndParentIsNull(postId, Sort.by(Sort.Direction.ASC, "createdDate"));
         return rootComments.stream()
                 .map(this::mapWithReplies)
                 .collect(Collectors.toList());

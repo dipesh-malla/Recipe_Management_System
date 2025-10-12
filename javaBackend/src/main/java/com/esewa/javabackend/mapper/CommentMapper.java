@@ -11,13 +11,13 @@ public interface CommentMapper {
 
     @Mapping(source = "author.id", target = "authorId")
     @Mapping(source = "author.displayName", target = "authorName")
-    @Mapping(source = "createdAt", target = "createdAt")
-    @Mapping(source = "modifiedDate", target = "editedAt")
+    @Mapping(source = "createdDate", target = "createdDate")
+    @Mapping(source = "modifiedDate", target = "editedDate")
     CommentDTO toDTO(Comment comment);
 
     @Mapping(source = "authorId", target = "author.id")
     @Mapping(source = "postId", target = "post.id")
-    @Mapping(source = "parentId", target = "parent.id")
+//    @Mapping(source = "parentId", target = "parent.id")
     Comment toEntity(CommentDTO commentDTO);
 }
 

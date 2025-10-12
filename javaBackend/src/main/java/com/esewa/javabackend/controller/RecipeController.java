@@ -3,33 +3,73 @@ package com.esewa.javabackend.controller;
 import com.esewa.javabackend.controller.Base.BaseController;
 import com.esewa.javabackend.dto.Base.GlobalApiRequest;
 import com.esewa.javabackend.dto.Base.GlobalApiResponse;
+import com.esewa.javabackend.dto.MediaDTO;
+import com.esewa.javabackend.dto.PostDTO;
+import com.esewa.javabackend.dto.RecipeCommentDTO;
 import com.esewa.javabackend.dto.RecipeDTO;
 import com.esewa.javabackend.enums.Messages;
+import com.esewa.javabackend.service.FileStorageService;
+import com.esewa.javabackend.service.RecipeCommentService;
 import com.esewa.javabackend.service.RecipeService;
 import com.esewa.javabackend.utils.SearchFilter;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/recipes")
 public class RecipeController extends BaseController {
 
     private final RecipeService recipeService;
-    public RecipeController(RecipeService recipeService) {
+    private final RecipeCommentService commentService;
+    private final FileStorageService  fileStorageService;
+
+
+    public RecipeController(RecipeService recipeService, RecipeCommentService commentService, FileStorageService fileStorageService) {
         this.recipeService = recipeService;
+        this.commentService = commentService;
+        this.fileStorageService = fileStorageService;
     }
 
-    @PostMapping
-    public ResponseEntity<GlobalApiResponse<?>> saveRecipe(@RequestBody RecipeDTO recipeDTO) {
-        return ResponseEntity.ok(successResponse(
-                recipeService.saveRecipe(recipeDTO),
-                Messages.SUCCESS,
-                "Recipe saved"
-        ));
+//    @PostMapping
+//    public ResponseEntity<GlobalApiResponse<?>> createRecipe(@RequestBody RecipeDTO recipeDTO) {
+//        return ResponseEntity.ok(successResponse(
+//                recipeService.saveRecipe(recipeDTO),
+//                Messages.SUCCESS,
+//                "Recipe saved"
+//        ));
+//    }
+
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<GlobalApiResponse<Integer>> saveRecipe(
+            @RequestPart("recipe") String recipeJson,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files
+    ) throws JsonProcessingException {
+
+        RecipeDTO recipeDTO = new ObjectMapper().readValue(recipeJson, RecipeDTO.class);
+
+        return ResponseEntity.ok(
+                successResponse(
+                        recipeService.saveRecipeWithMedia(recipeDTO, files),
+                        Messages.SUCCESS,
+                        "Recipe saved successfully"
+                )
+        );
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<GlobalApiResponse<?>> getRecipe(@PathVariable Integer id) {
+
+
+
+    @GetMapping("find/{id}")
+    public ResponseEntity<GlobalApiResponse<?>> getRecipe(@PathVariable("id") Integer id) {
         return ResponseEntity.ok(successResponse(
                 recipeService.getRecipeById(id),
                 Messages.SUCCESS,
@@ -37,7 +77,7 @@ public class RecipeController extends BaseController {
         ));
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("delete/{id}")
     public ResponseEntity<GlobalApiResponse<?>> deleteRecipe(@PathVariable Integer id) {
         recipeService.deleteRecipe(id);
         return ResponseEntity.ok(successResponse(
@@ -47,7 +87,7 @@ public class RecipeController extends BaseController {
         ));
     }
 
-    @PostMapping("/filter")
+    @GetMapping("/filter")
     public ResponseEntity<GlobalApiResponse<?>> getAllRecipes(
             @RequestBody GlobalApiRequest<SearchFilter> filterReq) {
         return ResponseEntity.ok(successResponse(
@@ -56,4 +96,49 @@ public class RecipeController extends BaseController {
                 "Recipes fetched"
         ));
     }
+
+    @GetMapping("/allRecipe")
+    public ResponseEntity<GlobalApiResponse<?>> getAllRecipes() {
+        return ResponseEntity.ok(
+                successResponse(
+                        recipeService.findAllRecipes(),
+                        Messages.SUCCESS,
+                        "Recipes fetched"
+                )
+        );
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<GlobalApiResponse<?>> getRecipeByUserId(@PathVariable Integer userId) {
+        return ResponseEntity.ok(successResponse(
+                recipeService.getRecipesByUser(userId),
+                Messages.SUCCESS,
+                "Recipe fetched"
+        ));
+    }
+
+
+
+//    Recipe comment api
+    @PostMapping("/comments")
+    public ResponseEntity<GlobalApiResponse<?>> addComment(@RequestBody RecipeCommentDTO  recipeCommentDTO) {
+
+        return ResponseEntity.ok(successResponse(
+             commentService.addComment(recipeCommentDTO),
+             Messages.SUCCESS,
+             "Comment added"
+        ));
+    }
+
+    @GetMapping("comment/{recipeId}")
+    public ResponseEntity<GlobalApiResponse<?>> getRecipeCommentById(@PathVariable Integer recipeId) {
+        return ResponseEntity.ok(
+                successResponse(
+                        commentService.getCommentsByRecipe(recipeId),
+                        Messages.SUCCESS,
+                        "Comment fetched"
+                )
+        );
+    }
+
 }

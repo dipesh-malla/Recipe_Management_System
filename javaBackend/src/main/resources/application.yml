@@ -14,6 +14,10 @@ spring:
       idle-timeout: 600000
       connection-timeout: 30000
       max-lifetime: 1800000
+  servlet:
+    multipart:
+      max-file-size: 50MB      # Maximum size per file (images + videos)
+      max-request-size: 100MB
 
   jpa:
     hibernate:
@@ -27,9 +31,9 @@ spring:
     open-in-view: false
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers:  127.0.0.1:9092
     consumer:
-      group-id: recipe-app
+      group-id: notification-group, interaction-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer

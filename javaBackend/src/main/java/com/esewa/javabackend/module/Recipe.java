@@ -1,17 +1,13 @@
 package com.esewa.javabackend.module;
 
-
 import com.esewa.javabackend.enums.ModerationStatus;
 import com.esewa.javabackend.module.base.AuditingEntity;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Getter
 @Setter
@@ -20,53 +16,46 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name = "recipes")
-public class Recipe  extends AuditingEntity {
+public class Recipe extends AuditingEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE)
     private Integer id;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "author_id")
+    @JoinColumn(name = "author_id", nullable = false)
     private User author;
 
     private String title;
 
     @Column(columnDefinition = "TEXT")
     private String description;
-
-    @Column(columnDefinition = "TEXT")
-    private String instructions;
-
-    @ElementCollection
-    @CollectionTable(name = "recipe_ingredients", joinColumns = @JoinColumn(name = "recipe_id"))
-    @Column(name = "ingredient")
-    private List<String> ingredients;
+//
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Instruction> instructions = new ArrayList<>();
 
     private Integer servings;
-
+    private String dietaryType;
     private Integer cookTime; // minutes
-
     private String cuisine;
+    private boolean isPublic = true;
 
-    private boolean isPublic;
 
-    @ElementCollection
-    @CollectionTable(name = "recipe_tags", joinColumns = @JoinColumn(name = "recipe_id"))
-    @Column(name = "tag")
-    private List<String> tags = new ArrayList<>();
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Media> media = new ArrayList<>();
 
-//    @Column(columnDefinition = "jsonb")
-//    private String nutrition; // JSON string (e.g., calories, macros)
-
-    @ElementCollection
-    @CollectionTable(name = "recipe_media", joinColumns = @JoinColumn(name = "recipe_id"))
-    @Column(name = "media_id")
-    private List<Integer> mediaIds =  new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
-    private ModerationStatus moderationStatus;
+    private ModerationStatus moderationStatus = ModerationStatus.PENDING;
 
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RecipeComment> comments = new ArrayList<>();
+
+
+
+    @OneToMany(mappedBy= "recipe",  cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Ingredients> ingredients = new ArrayList<>();
+
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Tag> tags = new ArrayList<>();
 }
-
-

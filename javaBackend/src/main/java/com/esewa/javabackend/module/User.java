@@ -43,8 +43,6 @@ public class User extends AuditingEntity {
 
     private boolean isChef;
 
-//    @Column(columnDefinition = "jsonb")
-//    private String dietaryPreferences;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_dietary_preferences", joinColumns = @JoinColumn(name = "user_id"))
@@ -65,11 +63,23 @@ public class User extends AuditingEntity {
 
     private boolean verified;
 
-    @OneToMany(mappedBy = "author")
+    @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Post> posts = new ArrayList<>();
 
     @OneToOne(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
     private Media profile;
+
+    @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Recipe> recipe;
+
+    @OneToMany(mappedBy = "followee", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Follow> followers = new ArrayList<>();
+
+    @OneToMany(mappedBy = "follower", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Follow> following = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Share> shares = new ArrayList<>();
 
 
 }

@@ -95,14 +95,14 @@ public class UserService {
     }
 
 
-//    @Transactional
-//    public Integer updateUserProfile(UserProfileDTO profileDTO, MultipartFile file) {
-//        User user = userRepository.findById(profileDTO.getId())
-//                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-//
-//        userMapper.updateProfile(profileDTO, user);
-//        return userRepository.save(user).getId();
-//    }
+    @Transactional
+    public Integer updateUserProfile(UserProfileDTO profileDTO, MultipartFile file) {
+        User user = userRepository.findById(profileDTO.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        userMapper.updateProfile(profileDTO, user);
+        return userRepository.save(user).getId();
+    }
 
 }
 

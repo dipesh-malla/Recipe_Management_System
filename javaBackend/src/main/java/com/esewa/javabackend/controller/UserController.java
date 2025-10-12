@@ -61,7 +61,7 @@ public class UserController extends BaseController {
 //            @RequestParam("userId") Integer userId,
 //            @RequestParam("file") MultipartFile file
 //    ) {
-//        String imageUrl = mediaService.uploadProfileImage(userId, file, "profile");
+//        String imageUrl = mediaService.updateUserProfile( file, "profile");
 //        return ResponseEntity.ok(successResponse(imageUrl, Messages.SUCCESS, "Profile picture updated "));
 //    }
 

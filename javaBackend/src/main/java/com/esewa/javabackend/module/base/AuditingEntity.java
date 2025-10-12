@@ -30,9 +30,9 @@ public abstract class AuditingEntity {
 
     @Column(name = "created_date", updatable = false)
     @CreatedDate
-    private LocalDateTime createdAt;
+    private LocalDateTime createdDate;
 
-    @Column(name = "created_by", updatable = false)
+    @Column(name = "created_by")
     @CreatedBy
     private Long createdBy;
 

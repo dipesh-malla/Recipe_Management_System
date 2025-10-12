@@ -1,38 +1,44 @@
 package com.esewa.javabackend.module;
 
-
+import com.esewa.javabackend.enums.NotificationType;
+import com.esewa.javabackend.module.base.AuditingEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
-import java.util.UUID;
 
+@Entity
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Entity
 @Table(name = "notifications")
-public class Notification {
+public class Notification extends AuditingEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "user_id")
-    private User user;
+    @ManyToOne
+    @JoinColumn(name = "receiver_id", nullable = false)
+    private User receiver;
 
-    private String type;
+    @ManyToOne
+    @JoinColumn(name = "sender_id", nullable = false)
+    private User sender;
 
-    @Column(columnDefinition = "jsonb")
-    private String payload; // JSON data for flexibility
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private NotificationType type;
 
-    private boolean isRead = false;
+    private String message;
 
-    @CreationTimestamp
-    private Instant createdAt;
+    private Integer referenceId; // postId, commentId, recipeId, conversationId etc.
+
+    private Boolean isRead = false;
+
+
+
 }
-

@@ -21,8 +21,8 @@ import java.util.UUID;
 public class Interaction {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "user_id")
@@ -31,7 +31,7 @@ public class Interaction {
     @Enumerated(EnumType.STRING)
     private ResourceType resourceType;
 
-    private UUID resourceId;
+    private Integer resourceId;
 
     @Enumerated(EnumType.STRING)
     private InteractionAction action;

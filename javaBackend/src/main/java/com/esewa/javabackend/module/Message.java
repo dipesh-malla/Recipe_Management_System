@@ -1,12 +1,11 @@
 package com.esewa.javabackend.module;
 
+import com.esewa.javabackend.module.base.AuditingEntity;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 @Getter
 @Setter
@@ -15,11 +14,11 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name = "messages")
-public class Message {
+public class Message extends AuditingEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "conversation_id")
@@ -32,17 +31,10 @@ public class Message {
     @Column(columnDefinition = "TEXT")
     private String body;
 
-    @ElementCollection
-    @CollectionTable(name = "message_media", joinColumns = @JoinColumn(name = "message_id"))
-    @Column(name = "media_id")
-    private List<UUID> mediaIds;
+    private Instant sentAt = Instant.now();
 
     @ElementCollection
     @CollectionTable(name = "message_read_by", joinColumns = @JoinColumn(name = "message_id"))
     @Column(name = "user_id")
-    private List<UUID> readBy;
-
-    @CreationTimestamp
-    private Instant createdAt;
+    private List<Integer> readBy;
 }
-

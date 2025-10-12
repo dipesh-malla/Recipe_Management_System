@@ -2,19 +2,20 @@ package com.esewa.javabackend.service;
 
 
 import com.esewa.javabackend.config.CustomMessageSource;
+import com.esewa.javabackend.config.kafka.InteractionProducer;
 import com.esewa.javabackend.dto.Base.response.PaginatedDtoResponse;
 import com.esewa.javabackend.dto.CommentDTO;
 import com.esewa.javabackend.dto.PostDTO;
+import com.esewa.javabackend.dto.event.InteractionEvent;
 import com.esewa.javabackend.dto.postDTO.PostResponseDTO;
-import com.esewa.javabackend.enums.MediaType;
-import com.esewa.javabackend.enums.Messages;
-import com.esewa.javabackend.enums.ModerationStatus;
+import com.esewa.javabackend.enums.*;
 import com.esewa.javabackend.mapper.PostMapper;
 import com.esewa.javabackend.module.Media;
 import com.esewa.javabackend.module.Post;
 import com.esewa.javabackend.repository.JpaRepository.MediaRepository;
 import com.esewa.javabackend.repository.JpaRepository.PostRepository;
 import com.esewa.javabackend.repository.JpaRepository.UserRepository;
+import com.esewa.javabackend.service.AIML.InteractionService;
 import com.esewa.javabackend.utils.AppConstants;
 import com.esewa.javabackend.utils.AppUtil;
 import com.esewa.javabackend.utils.PaginatedResHandler;
@@ -43,6 +44,8 @@ public class PostService {
     private final PostMapper postMapper;
     private final FileStorageService fileStorageService;
     private final CustomMessageSource messageSource;
+    private final InteractionService   interactionService;
+    private final InteractionProducer interactionProducer;
 
     private final String className = this.getClass().getName();
 
@@ -67,7 +70,7 @@ public class PostService {
         if (post.getId() == null && postDTO.getAuthorId() != null) {
             post.setAuthor(userRepository.findById(postDTO.getAuthorId())
                     .orElseThrow(() -> new ResourceNotFoundException(
-                            messageSource.getMessage("user.not.found", "User"))));
+                            messageSource.getMessage("not.found", "User"))));
         }
 
         // Update post fields
@@ -85,7 +88,7 @@ public class PostService {
 
                 Media media = Media.builder()
                         .post(post)
-                        .owner(post.getAuthor())
+//                        .owner(post.getAuthor())
                         .type(file.getContentType().startsWith("image/") ? MediaType.IMAGE : MediaType.VIDEO)
                         .url(fileUrl)
                         .moderationStatus(ModerationStatus.APPROVED)
@@ -96,6 +99,17 @@ public class PostService {
             mediaRepository.saveAll(mediaList);
             post.setMedias(mediaList);
         }
+
+        interactionProducer.sendInteraction(
+                InteractionEvent.builder()
+                        .userId(postDTO.getAuthorId())
+                        .resourceType(ResourceType.POST)
+                        .resourceId(post.getId())
+                        .action(InteractionAction.CREATE)
+                        .value(2.0)
+                        .build()
+        );
+
 
         return post.getId();
     }
@@ -117,9 +131,21 @@ public class PostService {
      */
     @Transactional
     public PostResponseDTO getPostResponseById(Integer id) {
+
+
+
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageSource.getMessage(Messages.NOT_FOUND.getCode(), "Post")));
+        interactionProducer.sendInteraction(
+                InteractionEvent.builder()
+                        .userId(post.getAuthor().getId())
+                        .resourceType(ResourceType.POST) // or ResourceType.RECIPE
+                        .resourceId(id)
+                        .action(InteractionAction.VIEW)
+                        .value(1.0)
+                        .build()
+        );
         return postMapper.toResponseDTO(post);
     }
 
@@ -138,12 +164,12 @@ public class PostService {
      * Paginated and filtered post list
      */
     @Transactional
-    public PaginatedDtoResponse<PostDTO> getAllPosts(SearchFilter filter) {
+    public PaginatedDtoResponse<PostResponseDTO> getAllPosts(SearchFilter filter) {
         log.info("{} - {} - Request filter: {}", className, AppUtil.getMethodName(), filter);
 
         if (filter == null || filter.getPagination() == null) {
             log.warn("{} - {} - Invalid filter or pagination info", className, AppUtil.getMethodName());
-            return PaginatedDtoResponse.<PostDTO>builder()
+            return PaginatedDtoResponse.<PostResponseDTO>builder()
                     .data(Collections.emptyList())
                     .totalElements(0L)
                     .totalPages(0)
@@ -162,7 +188,7 @@ public class PostService {
 
         if (postsPage.isEmpty()) {
             log.info("{} - {} - No posts found", className, AppUtil.getMethodName());
-            return PaginatedDtoResponse.<PostDTO>builder()
+            return PaginatedDtoResponse.<PostResponseDTO>builder()
                     .data(Collections.emptyList())
                     .totalElements(0L)
                     .totalPages(0)
@@ -170,7 +196,7 @@ public class PostService {
         }
 
         // Map to DTO
-        Page<PostDTO> dtoPage = postsPage.map(postMapper::toDTO);
+        Page<PostResponseDTO> dtoPage = postsPage.map(postMapper::toResponseDTO);
 
         return PaginatedResHandler.getPaginatedData(dtoPage);
     }
@@ -182,11 +208,38 @@ public class PostService {
     public Boolean deletePost(Integer id) {
         log.info("{} - {} - Delete request ID: {}", className, AppUtil.getMethodName(), id);
         try {
+            interactionProducer.sendInteraction(
+                    InteractionEvent.builder()
+                            .userId(postRepository.findById(id).get().getAuthor().getId())
+                            .resourceType(ResourceType.POST) // or ResourceType.RECIPE
+                            .resourceId(id)
+                            .action(InteractionAction.VIEW)
+                            .value(-1.0)
+                            .build()
+            );
+
             postRepository.deleteById(id);
             return true;
         } catch (Exception e) {
             log.error("{} - {} - Error deleting post: {}", className, AppUtil.getMethodName(), e.getMessage());
             return false;
         }
+    }
+
+
+
+    @Transactional
+    public List<PostResponseDTO> findPostByUserId(Integer id) {
+        return postRepository.findAllByUserId(id).stream().map(postMapper::toResponseDTO).toList();
+    }
+
+    @Transactional
+    public List<PostResponseDTO> getAllReelVideos() {
+        return postRepository.findPostsByMediaType(MediaType.VIDEO).stream().map(postMapper::toResponseDTO).toList();
+    }
+
+    @Transactional
+    public List<PostResponseDTO> getAllPostImage() {
+        return postRepository.findPostsByMediaType(MediaType.VIDEO).stream().map(postMapper::toResponseDTO).toList();
     }
 }

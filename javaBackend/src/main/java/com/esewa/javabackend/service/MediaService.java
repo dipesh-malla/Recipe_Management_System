@@ -32,13 +32,10 @@ public class MediaService {
         User user = userRepository.findById(profileDTO.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // Update fields via MapStruct
         userMapper.updateProfile(profileDTO, user);
 
-        // Handle profile picture upload
         if (profilePic != null && !profilePic.isEmpty()) {
 
-            // Delete old profile picture if exists
             Media existingProfile = user.getProfile();
             if (existingProfile != null && existingProfile.getUrl() != null) {
                 fileStorageService.deleteFile(existingProfile.getUrl());

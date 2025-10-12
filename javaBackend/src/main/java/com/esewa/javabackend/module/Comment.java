@@ -8,9 +8,8 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.util.List;
+import java.util.HashSet;
 import java.util.Set;
-
 
 @Getter
 @Setter
@@ -31,7 +30,7 @@ public class Comment extends AuditingEntity {
     private Comment parent; // nullable for root-level comment
 
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<Comment> replies;
+    private Set<Comment> replies = new HashSet<>();
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "author_id")
@@ -46,4 +45,3 @@ public class Comment extends AuditingEntity {
     @JoinColumn(name = "post_id")
     private Post post;
 }
-

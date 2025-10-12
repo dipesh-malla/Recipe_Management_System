@@ -4,10 +4,7 @@ package com.esewa.javabackend.module;
 import com.esewa.javabackend.enums.ResourceType;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.Instant;
-import java.util.UUID;
 
 @Getter
 @Setter
@@ -19,8 +16,8 @@ import java.util.UUID;
 public class Share {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "user_id")
@@ -29,12 +26,10 @@ public class Share {
     @Enumerated(EnumType.STRING)
     private ResourceType resourceType;
 
-    private UUID resourceId;
+    private Integer resourceId;
 
     @Column(columnDefinition = "TEXT")
     private String shareText;
 
-    @CreationTimestamp
-    private Instant createdAt;
 }
 

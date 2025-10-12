@@ -6,5 +6,11 @@ enum InteractionAction {
     CLICK,
     SAVE,
     COOK,
-    SHARE
+    SHARE,
+    COMMENT,
+    FOLLOW,
+    CREATE,
+    DELETE,
+    LIKE,
+    UNLIKE,
 }

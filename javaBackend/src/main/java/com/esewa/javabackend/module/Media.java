@@ -20,7 +20,7 @@ import java.util.UUID;
 public class Media extends AuditingEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @OneToOne
@@ -30,6 +30,11 @@ public class Media extends AuditingEntity {
     @ManyToOne
     @JoinColumn(name = "post_id")
     private Post post;
+
+
+    @ManyToOne
+    @JoinColumn(name = "recipe_id")
+    private Recipe recipe;
 
     @Enumerated(EnumType.STRING)
     private MediaType type;

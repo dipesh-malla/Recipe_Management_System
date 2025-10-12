@@ -22,8 +22,8 @@ import java.util.UUID;
 public class Report {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "reporter_id")
@@ -32,7 +32,7 @@ public class Report {
     @Enumerated(EnumType.STRING)
     private TargetTypes targetType;
 
-    private UUID targetId;
+    private Integer targetId;
 
     @Column(columnDefinition = "TEXT")
     private String reason;

@@ -18,16 +18,17 @@ import java.util.UUID;
 public class Embedding {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
     @Enumerated(EnumType.STRING)
     private ObjectType objectType;
 
-    private UUID objectId;
+    private Integer objectId;
 
     @Column(columnDefinition = "float8[]")
-    private float[] vector; // requires Postgres array type or serialize as JSON
+    private float[] vector;
+
 
     private String modelVersion;
 

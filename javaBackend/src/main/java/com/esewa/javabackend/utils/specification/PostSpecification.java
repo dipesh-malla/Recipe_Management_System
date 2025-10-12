@@ -42,18 +42,6 @@ public class PostSpecification {
                 });
             }
 
-            // Additional direct filters
-            if (filter.getAuthorId() != null) {
-                predicates.add(cb.equal(root.get("author").get("id"), filter.getAuthorId()));
-            }
-
-            if (filter.getPrivacy() != null) {
-                predicates.add(cb.equal(root.get("privacy"), filter.getPrivacy()));
-            }
-
-            if (filter.getPinned() != null) {
-                predicates.add(cb.equal(root.get("pinned"), filter.getPinned()));
-            }
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };

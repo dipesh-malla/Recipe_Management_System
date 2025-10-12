@@ -3,8 +3,6 @@ package com.esewa.javabackend.module;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.UUID;
-
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,9 +20,12 @@ public class UserStats {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    private int recipeCount; // number of recipes created
-    private int followersCount;
-    private int followingCount;
-    private int postCount;
-}
+    @Column(nullable = false)
+    private int recipeCount = 0;
 
+    @Column(nullable = false)
+    private int followersCount = 0;
+
+    @Column(nullable = false)
+    private int followingCount = 0;
+}

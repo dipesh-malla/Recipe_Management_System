@@ -4,9 +4,12 @@ import com.esewa.javabackend.controller.Base.BaseController;
 import com.esewa.javabackend.dto.Base.GlobalApiResponse;
 import com.esewa.javabackend.dto.CommentDTO;
 import com.esewa.javabackend.dto.ReactionDTO;
+import com.esewa.javabackend.dto.RecipeCommentDTO;
 import com.esewa.javabackend.enums.Messages;
+import com.esewa.javabackend.mapper.RecipeCommentMapper;
 import com.esewa.javabackend.module.Message;
 import com.esewa.javabackend.service.CommentReactionService;
+import com.esewa.javabackend.service.RecipeCommentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +21,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CommentReactionController extends BaseController {
     private final CommentReactionService commentReactionService;
+    private final RecipeCommentService  recipeCommentService;
 
     @PostMapping("/{postId}/comments")
     public ResponseEntity<GlobalApiResponse<CommentDTO>> addComment(
@@ -58,6 +62,22 @@ public class CommentReactionController extends BaseController {
         ));
 
     }
+
+
+//    @PostMapping("/{recipeId}/reactions")
+//    public ResponseEntity<GlobalApiResponse<ReactionDTO>> addRecipeReaction(
+//            @PathVariable Integer recipeId,
+//            @RequestBody RecipeCommentDTO reactionDTO
+//    ){
+//        reactionDTO.setPostId(postId);
+//        return ResponseEntity.ok(successResponse(
+//                commentReactionService.addReaction(reactionDTO),
+//                Messages.SUCCESS,
+//                "Reaction added successfully"
+//
+//        ));
+//
+//    }
 
 
 }

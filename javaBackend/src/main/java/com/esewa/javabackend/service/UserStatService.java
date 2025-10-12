@@ -19,6 +19,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,7 +35,6 @@ public class UserStatService {
 
 
 
-    // Create / Update
     public Integer saveUserStat(UserStatDTO statDTO) {
         log.info( className, AppUtil.getMethodName(), AppConstants.REQUEST, statDTO);
 
@@ -57,6 +57,12 @@ public class UserStatService {
                 .orElseThrow(() -> new ResourceNotFoundException("UserStat not found"));
     }
 
+    public UserStatDTO getUserStatByUserId(Integer id) {
+        log.info( className, AppUtil.getMethodName(), AppConstants.REQUEST, id);
+        return userStatRepository.findByUserId(id).map(userStatMapper::toDTO)
+                .orElseThrow(()-> new ResourceNotFoundException("Not found"));
+    }
+
     // Delete
     public void deleteUserStat(Integer id) {
         log.info( className, AppUtil.getMethodName(), AppConstants.REQUEST, id);
@@ -67,7 +73,7 @@ public class UserStatService {
     }
 
     // Filter
-    public PaginatedDtoResponse<UserStatDTO> getAllUserStats(SearchFilter filter) {
+    public PaginatedDtoResponse<UserStatDTO> filterUserState(SearchFilter filter) {
         log.info( className, AppUtil.getMethodName(), AppConstants.REQUEST, filter);
         PageRequest pageable = PageRequest.of(
                 filter.getPagination().getPage(),
@@ -79,6 +85,11 @@ public class UserStatService {
         Page<UserStatDTO> dtoPage = stats.map(userStatMapper::toDTO);
 
         return PaginatedResHandler.getPaginatedData(dtoPage);
+    }
+
+    public List<UserStatDTO> findAllUserStats() {
+        log.info( className, AppUtil.getMethodName(), AppConstants.REQUEST);
+        return userStatRepository.findAll().stream().map(userStatMapper::toDTO).toList();
     }
 }
 

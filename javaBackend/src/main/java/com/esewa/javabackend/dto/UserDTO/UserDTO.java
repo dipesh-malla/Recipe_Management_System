@@ -8,9 +8,9 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class UserDTO {
-
     private Integer id;
     private String username;
     private String displayName;
-    private String profileUrl;  // optional: URL of profile picture
+    private String profileUrl;
 }
+

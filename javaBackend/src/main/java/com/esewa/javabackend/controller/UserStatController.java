@@ -41,6 +41,15 @@ public class UserStatController extends BaseController {
         ));
     }
 
+    @GetMapping("userId/{id}")
+    public ResponseEntity<GlobalApiResponse<?>> getUserStatByUserId(@PathVariable Integer id) {
+        return ResponseEntity.ok(successResponse(
+                userStatService.getUserStatByUserId(id),
+                Messages.SUCCESS,
+                "UserStat fetched"
+        ));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<GlobalApiResponse<?>> deleteUserStat(@PathVariable Integer id) {
         userStatService.deleteUserStat(id);
@@ -55,7 +64,16 @@ public class UserStatController extends BaseController {
     public ResponseEntity<GlobalApiResponse<?>> getAllUserStats(
             @RequestBody GlobalApiRequest<SearchFilter> filterReq) {
         return ResponseEntity.ok(successResponse(
-                userStatService.getAllUserStats(filterReq.getData()),
+                userStatService.filterUserState(filterReq.getData()),
+                Messages.SUCCESS,
+                "UserStats fetched"
+        ));
+    }
+
+    @GetMapping("/allUserStats")
+    public ResponseEntity<GlobalApiResponse<?>> getAllUserStats() {
+        return ResponseEntity.ok(successResponse(
+                userStatService.findAllUserStats(),
                 Messages.SUCCESS,
                 "UserStats fetched"
         ));

@@ -20,8 +20,8 @@ public class CommentDTO {
     private String body;
     private String authorName;
     private boolean deletedFlag;
-    private LocalDateTime createdAt;
-    private LocalDateTime editedAt;
+    private LocalDateTime createdDate;
+    private LocalDateTime editedDate;
     private Integer postId;
     private Set<CommentDTO> replies;
 }

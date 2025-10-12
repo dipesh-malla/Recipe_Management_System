@@ -14,5 +14,7 @@ public class UserStatDTO {
     private Integer id;
     private Integer userId;
     private boolean active;
+    private int followerCount;
+    private int followingCount;
     private LocalDateTime lastLogin;
 }

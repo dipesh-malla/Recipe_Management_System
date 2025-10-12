@@ -3,12 +3,8 @@ package com.esewa.javabackend.module;
 import com.esewa.javabackend.module.base.AuditingEntity;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 @Getter
 @Setter
@@ -20,9 +16,10 @@ import java.util.UUID;
 public class Conversation extends AuditingEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
+    // Many-to-many for participants
     @ManyToMany
     @JoinTable(
             name = "conversation_participants",
@@ -31,10 +28,6 @@ public class Conversation extends AuditingEntity {
     )
     private List<User> participants;
 
-//    @CreationTimestamp
-//    private Instant createdAt;
-//
-//    @UpdateTimestamp
-//    private Instant updatedAt;
+    @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Message> messages;
 }
-

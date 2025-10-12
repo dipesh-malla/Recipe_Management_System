@@ -10,7 +10,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class GroupDTO {
-    private UUID id;
+    private Integer id;
     private String name;
     private String slug;
     private String description;

@@ -1,6 +1,7 @@
 package com.esewa.javabackend.module;
 
 
+import com.esewa.javabackend.enums.MediaType;
 import com.esewa.javabackend.enums.Privacy;
 import com.esewa.javabackend.module.base.AuditingEntity;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
@@ -26,13 +27,12 @@ public class Post extends AuditingEntity {
     private Integer id;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "author_id")
     private User author;
 
     @Column(columnDefinition = "TEXT")
     private String contentText;
 
-    @OneToMany(mappedBy = "post", cascade =  CascadeType.ALL)
+    @OneToMany(mappedBy = "post", cascade =  CascadeType.ALL, orphanRemoval = true)
     private List<Media> medias = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)

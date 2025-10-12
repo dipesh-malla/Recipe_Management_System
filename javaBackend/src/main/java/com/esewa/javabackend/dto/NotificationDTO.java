@@ -1,18 +1,37 @@
 package com.esewa.javabackend.dto;
 
-import lombok.*;
 
-import java.util.UUID;
+import com.esewa.javabackend.enums.NotificationType;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Getter
-@Setter
+import java.time.Instant;
+import java.time.LocalDateTime;
+
+@Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class NotificationDTO {
-    private UUID id;
-    private UUID userId;
-    private String type;
-    private String payload;
+
+    private Integer id;
+
+    private Integer senderId;
+    private String senderUsername;
+
+    private Integer receiverId;
+    private String receiverUsername;
+
+    private NotificationType type;
+
+    private String message;
+
+    private Integer referenceId; // e.g., postId, followeeId, commentId
+
     private boolean isRead;
+
+    private LocalDateTime createdDate;
 }
+
