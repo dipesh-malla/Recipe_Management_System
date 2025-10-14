@@ -2,6 +2,7 @@ package com.esewa.javabackend.controller;
 
 
 import com.esewa.javabackend.dto.InteractionDTO;
+import com.esewa.javabackend.dto.aiml.EmbeddingDTO;
 import com.esewa.javabackend.enums.*;
 import com.esewa.javabackend.module.AIML.Embedding;
 import com.esewa.javabackend.module.AIML.Interaction;
@@ -13,12 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * Unified controller for AI/ML data collection and embedding management.
- * Handles:
- *  - Logging user interactions
- *  - Managing vector embeddings for recipes, posts, and users
- */
+
 @RestController
 @RequestMapping("/api/aiml")
 @RequiredArgsConstructor
@@ -28,9 +24,7 @@ public class AIMLController {
     private final EmbeddingService embeddingService;
 
 
-    /**
-     * Log a user interaction with a post or recipe (view, like, save, comment, etc.)
-     */
+
     @PostMapping("/interactions")
     public ResponseEntity<InteractionDTO> logInteraction(
             @RequestBody InteractionDTO interactionDTO
@@ -51,19 +45,14 @@ public class AIMLController {
         return ResponseEntity.ok(interactionService.allInteraction());
     }
 
-    /**
-     * Get all interactions for a user (optional — for debugging or analytics)
-     */
+
 //    @GetMapping("/interactions/{userId}")
 //    public ResponseEntity<List<Interaction>> getInteractionsByUser(@PathVariable Integer userId) {
 //        return ResponseEntity.ok(interactionService.getInteractionsByUser(userId));
 //    }
 
 
-    /**
-     * Create or update an embedding for a given object (recipe, post, or user)
-     * Called by your Python AI microservice after generating embeddings.
-     */
+
     @PostMapping("/embeddings")
     public ResponseEntity<Embedding> createOrUpdateEmbedding(
             @RequestParam ObjectType objectType,
@@ -75,9 +64,7 @@ public class AIMLController {
         return ResponseEntity.ok(saved);
     }
 
-    /**
-     * Get embedding for a single object (e.g., one recipe)
-     */
+
     @GetMapping("/embeddings/{objectType}/{objectId}")
     public ResponseEntity<Embedding> getEmbedding(
             @PathVariable ObjectType objectType,
@@ -87,12 +74,15 @@ public class AIMLController {
         return embedding != null ? ResponseEntity.ok(embedding) : ResponseEntity.notFound().build();
     }
 
-    /**
-     * Get all embeddings of a given type (e.g., all recipes)
-     */
+
     @GetMapping("/embeddings/{objectType}")
     public ResponseEntity<List<Embedding>> getAllByType(@PathVariable ObjectType objectType) {
         return ResponseEntity.ok(embeddingService.getAllByType(objectType));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<EmbeddingDTO>> getAllEmbeddings() {
+        return ResponseEntity.ok(embeddingService.getAllEmbeddings());
     }
 }
 

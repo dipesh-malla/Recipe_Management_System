@@ -304,4 +304,8 @@ public class FollowService {
         return follower && following;
     }
 
+    public List<FollowDTO> getAllFollows() {
+        return followRepository.findAll().stream().map(this::toDTO).toList();
+    }
+
 }
