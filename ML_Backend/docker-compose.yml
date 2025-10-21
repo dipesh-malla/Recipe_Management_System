@@ -12,8 +12,8 @@ services:
       - "9090:9090"  # Prometheus metrics
     environment:
       # Application
-      - DEBUG=false
-      - LOG_LEVEL=INFO
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
       
       # Java Backend Integration
       - JAVA_BACKEND_URL=http://java-backend:8080

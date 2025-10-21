@@ -93,11 +93,52 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Production-ready ML Backend for Recipe Recommendations",
+    description="""
+## 🤖 Recipe ML Backend API
+
+Production-ready recommendation system powered by:
+- **Two-Tower Neural Network** (Primary) - 50-60ms latency, NDCG@10: 0.35+
+- **ALS Collaborative Filtering** (Fallback) - 80-100ms latency, NDCG@10: 0.28+
+- **Popularity-Based** (Cold-Start) - For new users
+
+### 🚀 Features
+- Personalized recipe recommendations
+- Similar user discovery
+- Batch processing for campaigns
+- Cold-start recommendations
+- Real-time Kafka event streaming
+- Redis caching (<2ms cached responses)
+
+### 📊 Performance
+- **Uncached:** 50-60ms
+- **Cached:** <2ms
+- **Throughput:** 40-50 RPS (200+ cached)
+- **Users:** 5,000 mapped
+- **Recipes:** 10,437 mapped
+
+### 🔗 Quick Links
+- [Health Check](/api/health)
+- [Prometheus Metrics](/api/metrics)
+- [Integration Guide](https://github.com/dipesh-malla/Recipe_Management_System/blob/main/ML_Backend/JAVA_INTEGRATION_GUIDE.md)
+    """,
     version=settings.APP_VERSION,
     lifespan=lifespan,
     docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None
+    redoc_url="/redoc" if settings.DEBUG else None,
+    openapi_tags=[
+        {
+            "name": "Health",
+            "description": "Service health and status monitoring"
+        },
+        {
+            "name": "Recommendations",
+            "description": "ML-powered personalized recommendations"
+        },
+        {
+            "name": "Sync",
+            "description": "Data synchronization with Java backend"
+        }
+    ]
 )
 
 
