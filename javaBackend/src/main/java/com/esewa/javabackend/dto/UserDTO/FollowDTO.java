@@ -15,5 +15,6 @@ public class FollowDTO {
     private UserDTO followee;
     private LocalDateTime createdDate;
     private String status;
+    private boolean isNew;
 }
 

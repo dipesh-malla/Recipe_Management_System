@@ -33,6 +33,7 @@ public class InteractionService {
                 .action(action)
                 .value(value)
                 .createdAt(Instant.now())
+                .isNew(true)
                 .build();
          repository.save(interaction);
          return InteractionDTO.builder()
@@ -45,6 +46,22 @@ public class InteractionService {
     }
 
     public List<InteractionDTO> allInteraction() {
+
+        return repository.findAll().stream()
+                .map(interaction -> InteractionDTO.builder()
+                        .id(interaction.getId())
+                        .userId(interaction.getUser().getId())
+                        .resourceType(interaction.getResourceType())
+                        .resourceId(interaction.getResourceId())
+                        .action(interaction.getAction())
+                        .value(interaction.getValue())
+                        .createdAT(interaction.getCreatedAt())
+                        .isNew(interaction.isNew())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    public List<InteractionDTO> newInteraction() {
 
         return repository.findAll().stream()
                 .map(interaction -> InteractionDTO.builder()

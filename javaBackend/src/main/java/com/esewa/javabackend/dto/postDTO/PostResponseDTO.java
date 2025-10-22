@@ -25,5 +25,6 @@ public class PostResponseDTO {
     private List<MediaDTO> medias;
     private List<CommentDTO> comments;
     private List<ReactionDTO> reactions;
+    private boolean isNew;
 }
 

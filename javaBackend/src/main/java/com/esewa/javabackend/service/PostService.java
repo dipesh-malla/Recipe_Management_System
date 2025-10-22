@@ -73,9 +73,11 @@ public class PostService {
                             messageSource.getMessage("not.found", "User"))));
         }
 
+
         // Update post fields
         postMapper.updatePostFromDTO(postDTO, post);
 
+        post.setNew(true);
         // Save post to get ID
         post = postRepository.save(post);
 
@@ -107,6 +109,7 @@ public class PostService {
                         .resourceId(post.getId())
                         .action(InteractionAction.CREATE)
                         .value(2.0)
+                        .isNew(true)
                         .build()
         );
 
@@ -144,6 +147,7 @@ public class PostService {
                         .resourceId(id)
                         .action(InteractionAction.VIEW)
                         .value(1.0)
+                        .isNew(true)
                         .build()
         );
         return postMapper.toResponseDTO(post);
@@ -215,6 +219,7 @@ public class PostService {
                             .resourceId(id)
                             .action(InteractionAction.VIEW)
                             .value(-1.0)
+                            .isNew(true)
                             .build()
             );
 

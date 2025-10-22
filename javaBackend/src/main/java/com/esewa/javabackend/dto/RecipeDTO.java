@@ -29,4 +29,7 @@ public class    RecipeDTO {
     private LocalDateTime createdDate;
     private LocalDateTime modifiedDate;
     private List<MediaDTO> media;
+//    private
+
+    private boolean isNew;
 }

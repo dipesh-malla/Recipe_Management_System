@@ -65,6 +65,7 @@ public class FollowService {
                 .follower(follower)
                 .followee(followee)
                 .status(FollowStatus.ACTIVE)
+                .isNew(true)
                 .build();
 
         followRepository.save(follow);
@@ -89,6 +90,7 @@ public class FollowService {
                         .resourceId(followee.getId())
                         .action(InteractionAction.FOLLOW)
                         .value(4.0)
+                        .isNew(true)
                         .build()
         );
 
@@ -168,7 +170,8 @@ public class FollowService {
                         .displayName(f.getFollower().getDisplayName())
                         .profile(f.getFollower().getProfile() != null
                                 ? f.getFollower().getProfile().getUrl()
-                                : null)                        .build())
+                                : null)
+                        .build())
                 .toList();
     }
 
@@ -180,9 +183,10 @@ public class FollowService {
                         .id(f.getFollowee().getId())
                         .username(f.getFollowee().getUsername())
                         .displayName(f.getFollowee().getDisplayName())
-                        .profile(f.getFollower().getProfile() != null
-                                ? f.getFollower().getProfile().getUrl()
-                                : null)                        .build())
+                        .profile(f.getFollowee().getProfile() != null
+                                ? f.getFollowee().getProfile().getUrl()
+                                : null)
+                        .build())
                 .toList();
     }
 
@@ -230,7 +234,7 @@ public class FollowService {
                 ? (String) filter.getFilters().get("searchType")
                 : null;
 
-        Page<FollowDTO> dtoPage;
+        Page<FollowDTO> dtoPage ;
 
         if ("FOLLOWERS".equalsIgnoreCase(searchType)) {
             // Only return Follower info
@@ -262,7 +266,8 @@ public class FollowService {
                     .status(String.valueOf(f.getStatus()))
                     .createdDate(f.getCreatedDate())
                     .build());
-        } else {
+        }
+        else {
             // Default (if no searchType) — both sides
             dtoPage = followsPage.map(this::toDTO);
         }
@@ -280,8 +285,8 @@ public class FollowService {
                         .id(follow.getFollower().getId())
                         .username(follow.getFollower().getUsername())
                         .displayName(follow.getFollower().getDisplayName())
-                        .profileUrl(follow.getFollowee().getProfile() != null
-                                ? follow.getFollowee().getProfile().getUrl()
+                        .profileUrl(follow.getFollower().getProfile() != null
+                                ? follow.getFollower().getProfile().getUrl()
                                 : null)
                         .build())
                 .followee(UserDTO.builder()
@@ -294,6 +299,7 @@ public class FollowService {
                         .build())
                 .status(String.valueOf(follow.getStatus()))
                 .createdDate(follow.getCreatedDate())
+                .isNew(follow.isNew())
                 .build();
     }
 

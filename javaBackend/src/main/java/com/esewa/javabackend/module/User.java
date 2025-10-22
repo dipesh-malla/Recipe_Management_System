@@ -79,7 +79,9 @@ public class User extends AuditingEntity {
     private List<Follow> following = new ArrayList<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Share> shares = new ArrayList<>();
+    private List<Save> shares = new ArrayList<>();
 
+
+    private boolean isNew = true;
 
 }

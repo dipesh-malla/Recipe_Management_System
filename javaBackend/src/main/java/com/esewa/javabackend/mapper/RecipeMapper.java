@@ -30,6 +30,7 @@ public interface RecipeMapper {
 
     // --- Recipe → RecipeDTO ---
     @Mapping(source = "author.id", target = "authorId")
+    @Mapping(target = "isNew", source = "new")
     RecipeDTO toDTO(Recipe recipe);
 
     // --- Instructions mapping ---
