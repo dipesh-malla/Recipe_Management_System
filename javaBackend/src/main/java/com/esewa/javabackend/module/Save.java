@@ -12,8 +12,8 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "shares")
-public class Share {
+@Table(name = "save")
+public class Save {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

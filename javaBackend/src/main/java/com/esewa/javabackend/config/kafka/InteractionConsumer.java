@@ -42,6 +42,7 @@ public class InteractionConsumer {
                 .resourceId(event.getResourceId())
                 .action(event.getAction() != null ? event.getAction() : InteractionAction.VIEW)
                 .value(event.getValue())
+                .isNew(true)
                 .build();
 
         interactionRepository.save(interaction);

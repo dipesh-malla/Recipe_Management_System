@@ -73,6 +73,7 @@ public class RecipeService {
         recipe.setDietaryType(recipeDTO.getDietaryType());
         recipe.setPublic(recipeDTO.isPublic());
         recipe.setServings(recipeDTO.getServings());
+        recipe.setNew(true);
 
         Recipe savedRecipe = recipeRepository.save(recipe);
         if (recipeDTO.getInstructions() != null) {
@@ -139,6 +140,7 @@ public class RecipeService {
                         .resourceId(recipe.getId())
                         .action(InteractionAction.CREATE)
                         .value(4.0)
+                        .isNew(true)
                         .build()
         );
 
@@ -169,6 +171,7 @@ public class RecipeService {
                         .resourceId(id)
                         .action(InteractionAction.VIEW)
                         .value(2.0)
+                        .isNew(true)
                         .build()
         );
         return recipeRepository.findById(id)

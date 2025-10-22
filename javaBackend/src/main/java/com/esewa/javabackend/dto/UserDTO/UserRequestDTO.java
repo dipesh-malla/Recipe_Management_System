@@ -13,4 +13,5 @@ public class UserRequestDTO {
     private String displayName;
     private String email;
     private String password;
+    private boolean isNew = true;
 }

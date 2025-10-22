@@ -23,4 +23,5 @@ public class InteractionDTO {
     private InteractionAction action;
     private Double value;
     private Instant createdAT;
+    private boolean isNew;
 }
