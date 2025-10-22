@@ -24,5 +24,6 @@ public class UserResponseDTO {
     private String privacySettings;
     private boolean verified;
     private MediaDTO profile;
+    private boolean isNew;
 }
 

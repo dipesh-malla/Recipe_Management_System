@@ -46,6 +46,7 @@ public class UserService {
 
 //        User mapped = userMapper.toEntity(userDTO);
 //        mapped.setId(user.getId()); // preserve ID if update
+        user.setNew(userDTO.isNew());
         userMapper.updateEntity(userDTO, user);
 
         return userRepository.save(user).getId();
@@ -91,6 +92,14 @@ public class UserService {
         return userRepository.findAll()
                 .stream()
                 .map(userMapper::toDTO) // map entity -> DTO
+                .toList();
+    }
+
+    @Transactional
+    public List<UserResponseDTO> getAllUsersForAiml() {
+        return userRepository.findAll()
+                .stream()
+                .map(userMapper::toDTO)
                 .toList();
     }
 

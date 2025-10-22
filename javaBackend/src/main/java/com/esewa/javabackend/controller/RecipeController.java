@@ -3,19 +3,15 @@ package com.esewa.javabackend.controller;
 import com.esewa.javabackend.controller.Base.BaseController;
 import com.esewa.javabackend.dto.Base.GlobalApiRequest;
 import com.esewa.javabackend.dto.Base.GlobalApiResponse;
-import com.esewa.javabackend.dto.MediaDTO;
-import com.esewa.javabackend.dto.PostDTO;
 import com.esewa.javabackend.dto.RecipeCommentDTO;
 import com.esewa.javabackend.dto.RecipeDTO;
 import com.esewa.javabackend.enums.Messages;
 import com.esewa.javabackend.service.FileStorageService;
-import com.esewa.javabackend.service.RecipeCommentService;
+import com.esewa.javabackend.service.RecipeCommentReactionService;
 import com.esewa.javabackend.service.RecipeService;
 import com.esewa.javabackend.utils.SearchFilter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.AllArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,13 +24,11 @@ import java.util.List;
 public class RecipeController extends BaseController {
 
     private final RecipeService recipeService;
-    private final RecipeCommentService commentService;
     private final FileStorageService  fileStorageService;
 
 
-    public RecipeController(RecipeService recipeService, RecipeCommentService commentService, FileStorageService fileStorageService) {
+    public RecipeController(RecipeService recipeService, RecipeCommentReactionService commentService, FileStorageService fileStorageService) {
         this.recipeService = recipeService;
-        this.commentService = commentService;
         this.fileStorageService = fileStorageService;
     }
 
@@ -120,25 +114,6 @@ public class RecipeController extends BaseController {
 
 
 //    Recipe comment api
-    @PostMapping("/comments")
-    public ResponseEntity<GlobalApiResponse<?>> addComment(@RequestBody RecipeCommentDTO  recipeCommentDTO) {
 
-        return ResponseEntity.ok(successResponse(
-             commentService.addComment(recipeCommentDTO),
-             Messages.SUCCESS,
-             "Comment added"
-        ));
-    }
-
-    @GetMapping("comment/{recipeId}")
-    public ResponseEntity<GlobalApiResponse<?>> getRecipeCommentById(@PathVariable Integer recipeId) {
-        return ResponseEntity.ok(
-                successResponse(
-                        commentService.getCommentsByRecipe(recipeId),
-                        Messages.SUCCESS,
-                        "Comment fetched"
-                )
-        );
-    }
 
 }

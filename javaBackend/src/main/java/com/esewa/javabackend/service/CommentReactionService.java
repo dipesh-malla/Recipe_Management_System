@@ -11,6 +11,7 @@ import com.esewa.javabackend.enums.NotificationType;
 import com.esewa.javabackend.enums.ReactionType;
 import com.esewa.javabackend.enums.ResourceType;
 import com.esewa.javabackend.mapper.CommentMapper;
+import com.esewa.javabackend.mapper.ReactionMapper;
 import com.esewa.javabackend.module.Comment;
 import com.esewa.javabackend.module.Post;
 import com.esewa.javabackend.module.Reaction;
@@ -42,6 +43,7 @@ public class CommentReactionService {
     private final NotificationProducer notificationProducer;
     private final InteractionService  interactionService;
     private final InteractionProducer interactionProducer;
+    private final ReactionMapper reactionMapper;
 
 
     @Transactional
@@ -89,6 +91,7 @@ public class CommentReactionService {
                         .resourceId(post.getId())
                         .action(InteractionAction.COMMENT)
                         .value(3.0)
+                        .isNew(true)
                         .build()
         );
 
@@ -142,6 +145,7 @@ public class CommentReactionService {
                         .resourceId(post.getId())
                         .action(InteractionAction.LIKE)
                         .value(2.0)
+                        .isNew(true)
                         .build()
         );
 
@@ -165,5 +169,10 @@ public class CommentReactionService {
                 .collect(Collectors.toSet());
         dto.setReplies(replies);
         return dto;
+    }
+
+    public List<ReactionDTO> getReactionByPost(Integer postId) {
+
+        return reactionRepository.findAllByPostId(postId).stream().map(reactionMapper::toDTO).collect(Collectors.toList());
     }
 }

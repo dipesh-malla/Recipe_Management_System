@@ -35,6 +35,8 @@ public class Follow extends AuditingEntity {
 
     @Enumerated(EnumType.STRING)
     private FollowStatus status;
+
+    private boolean isNew = true;
 }
 
 
