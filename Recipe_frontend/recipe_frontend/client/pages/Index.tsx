@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import MainLayout from "@/components/MainLayout";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { getAllRecipes } from "@/lib/api";
+import { getAllRecipes, getAllUsers, getAllUserStats } from "@/lib/api";
 import {
   Search,
   ChefHat,
@@ -36,7 +36,6 @@ export default function Index() {
   const fetchDynamicData = async () => {
     try {
       setIsLoading(true);
-
       // Fetch only 6 recipes for landing page (optimized)
       const recipesResponse = await getAllRecipes(0, 6, "createdDate", "DESC");
       const recipes = recipesResponse.data?.content || recipesResponse.data || [];
@@ -56,51 +55,53 @@ export default function Index() {
 
       setFeaturedRecipes(formattedRecipes);
 
-      // Use static data for chefs to avoid slow API call
-      // In production, you'd want a paginated /users endpoint
-      const staticChefs = [
-        {
-          id: 1,
-          name: "Chef Marco",
-          specialty: "Italian Cuisine",
-          followers: 15240,
-          recipes: 48,
-          image: "https://placehold.co/150x150/fecaca/991b1b?text=Chef+M",
-        },
-        {
-          id: 2,
-          name: "Chef Priya",
-          specialty: "Indian & Fusion",
-          followers: 12850,
-          recipes: 62,
-          image: "https://placehold.co/150x150/bfdbfe/1e40af?text=Chef+P",
-        },
-        {
-          id: 3,
-          name: "Chef Takeshi",
-          specialty: "Japanese Cuisine",
-          followers: 18900,
-          recipes: 74,
-          image: "https://placehold.co/150x150/fde68a/ca8a04?text=Chef+T",
-        },
-        {
-          id: 4,
-          name: "Chef Sofia",
-          specialty: "Mediterranean",
-          followers: 11240,
-          recipes: 55,
-          image: "https://placehold.co/150x150/bbf7d0/15803d?text=Chef+S",
-        },
+      // compute totalRecipesFromPage early so downstream logic can reference it
+      let totalRecipesFromPage = recipesResponse.data?.totalElements || recipes.length;
+
+      // Fetch top users/chefs and community stats in parallel to speed up page load
+      const usersPromise = getAllUsers(0, 4); // fetch fewer users for landing speed
+      const statsPromise = getAllUserStats();
+
+      const [usersResult, statsResult] = await Promise.allSettled([usersPromise, statsPromise]);
+
+      let usersArray: any[] = [];
+      if (usersResult.status === 'fulfilled') {
+        const usersResponse = usersResult.value;
+        const usersRaw = usersResponse?.data?.content ?? usersResponse?.data ?? usersResponse ?? [];
+        usersArray = Array.isArray(usersRaw) ? usersRaw : (usersRaw?.content ?? []);
+      } else {
+        console.warn('Failed to fetch users for trending chefs:', usersResult.reason);
+      }
+
+      const formattedChefs = usersArray.length > 0 ? usersArray.map((u: any) => ({
+        id: u.id,
+        name: u.displayName || u.name || u.username || `User ${u.id}`,
+        specialty: u.profile?.specialty || u.specialty || 'General Cuisine',
+        followers: u.followersCount ?? u.followers ?? 0,
+        recipes: u.recipeCount ?? u.recipes ?? 0,
+        image: u.profile?.url || `https://i.pravatar.cc/150?u=${u.id}`,
+      })) : [
+        { id: 1, name: 'Chef Marco', specialty: 'Italian Cuisine', followers: 15240, recipes: 48, image: 'https://placehold.co/150x150/fecaca/991b1b?text=Chef+M' },
+        { id: 2, name: 'Chef Priya', specialty: 'Indian & Fusion', followers: 12850, recipes: 62, image: 'https://placehold.co/150x150/bfdbfe/1e40af?text=Chef+P' },
+        { id: 3, name: 'Chef Takeshi', specialty: 'Japanese Cuisine', followers: 18900, recipes: 74, image: 'https://placehold.co/150x150/fde68a/ca8a04?text=Chef+T' },
+        { id: 4, name: 'Chef Sofia', specialty: 'Mediterranean', followers: 11240, recipes: 55, image: 'https://placehold.co/150x150/bbf7d0/15803d?text=Chef+S' },
       ];
 
-      setTrendingChefs(staticChefs);
+      setTrendingChefs(formattedChefs);
 
-      // Set approximate statistics (no need to fetch all data)
-      const totalRecipesFromPage = recipesResponse.data?.totalElements || recipes.length;
+      let communityCount = 500;
+      if (statsResult.status === 'fulfilled') {
+        const allStatsResp = statsResult.value;
+        communityCount = allStatsResp?.data?.totalElements ?? (Array.isArray(allStatsResp?.data) ? allStatsResp.data.length : communityCount);
+      } else {
+        console.warn('Failed to fetch community stats:', statsResult.reason);
+      }
+
+      // Set consolidated stats once
       setStats({
         totalRecipes: totalRecipesFromPage > 0 ? totalRecipesFromPage : 50,
-        totalUsers: 25,
-        totalCommunity: 500,
+        totalUsers: usersArray.length || (usersResult.status === 'fulfilled' ? (usersResult as any).value?.data?.totalElements ?? 25 : 25),
+        totalCommunity: communityCount || 500,
       });
 
     } catch (error) {
