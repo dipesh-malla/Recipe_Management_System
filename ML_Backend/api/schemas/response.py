@@ -16,6 +16,10 @@ class RecipeRecommendation(BaseModel):
     calories_per_serving: Optional[float] = Field(None, description="Calories per serving")
     avg_rating: Optional[float] = Field(None, description="Average rating")
     
+    chef: Optional[str] = Field(None, description="Chef name")
+    likes: Optional[int] = Field(None, description="Number of likes")
+    comments: Optional[int] = Field(None, description="Number of comments")
+
     model_config = {"json_schema_extra": {
         "example": {
             "recipe_id": 456,
@@ -27,7 +31,10 @@ class RecipeRecommendation(BaseModel):
             "cook_time": 30,
             "difficulty": "easy",
             "calories_per_serving": 320.5,
-            "avg_rating": 4.5
+            "avg_rating": 4.5,
+            "chef": "Chef Priya",
+            "likes": 120,
+            "comments": 15
         }
     }}
 
