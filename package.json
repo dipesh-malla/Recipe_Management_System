@@ -1,0 +1,13 @@
+{
+  "scripts": {
+    "start:backend": "cd javaBackend && mvnw spring-boot:run",
+    "start:frontend": "cd Recipe_frontend/recipe_frontend && pnpm run dev",
+    "start:ml": "cd ML_Backend && python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "test:backend": "powershell -File test-backend.ps1",
+    "setup": "cd Recipe_frontend/recipe_frontend && pnpm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
