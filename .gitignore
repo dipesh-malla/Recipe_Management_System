@@ -3,8 +3,7 @@
 # Java
 /javaBackend/target/
 
-# Frontend
-/Recipe_frontend/recipe_frontend/node_modules/
+
 
 # Python
 /ML_Backend/env/
