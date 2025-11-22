@@ -1,6 +1,5 @@
 package com.esewa.javabackend.dto.UserDTO;
 
-
 import com.esewa.javabackend.dto.MediaDTO;
 import lombok.*;
 
@@ -24,5 +23,6 @@ public class UserResponseDTO {
     private String privacySettings;
     private boolean verified;
     private MediaDTO profile;
+    private String profileUrl;
+    private UserStatDTO stats;
 }
-
