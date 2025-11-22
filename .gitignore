@@ -1,0 +1,22 @@
+# Repository-level ignores for build artifacts, virtual envs, and IDE files
+
+# Java
+/javaBackend/target/
+
+# Frontend
+/Recipe_frontend/recipe_frontend/node_modules/
+
+# Python
+/ML_Backend/env/
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# IDEs
+/.idea/
+
+# OS
+.DS_Store
+
+# Local env files (do NOT add secrets here if they should be kept)
+*.env
