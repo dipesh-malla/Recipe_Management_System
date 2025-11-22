@@ -9,8 +9,14 @@ import org.mapstruct.Mapping;
 public interface UserStatMapper {
 
     @Mapping(source = "user.id", target = "userId")
+    @Mapping(source = "followersCount", target = "followersCount")
+    @Mapping(source = "followingCount", target = "followingCount")
+    @Mapping(source = "recipeCount", target = "recipeCount")
     UserStatDTO toDTO(UserStats userStat);
 
     @Mapping(source = "userId", target = "user.id")
+    @Mapping(source = "followersCount", target = "followersCount")
+    @Mapping(source = "followingCount", target = "followingCount")
+    @Mapping(source = "recipeCount", target = "recipeCount")
     UserStats toEntity(UserStatDTO userStatDTO);
 }
