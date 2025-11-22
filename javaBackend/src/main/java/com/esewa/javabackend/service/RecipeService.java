@@ -12,6 +12,8 @@ import com.esewa.javabackend.module.*;
 import com.esewa.javabackend.repository.JpaRepository.MediaRepository;
 import com.esewa.javabackend.repository.JpaRepository.RecipeRepository;
 import com.esewa.javabackend.repository.JpaRepository.UserRepository;
+import com.esewa.javabackend.repository.JpaRepository.ReactionRepository;
+import com.esewa.javabackend.repository.JpaRepository.RecipeCommentRepository;
 import com.esewa.javabackend.service.AIML.InteractionService;
 import com.esewa.javabackend.utils.AppUtil;
 import com.esewa.javabackend.utils.PaginatedResHandler;
@@ -19,7 +21,11 @@ import com.esewa.javabackend.utils.SearchFilter;
 import com.esewa.javabackend.utils.specification.RecipeSpecification;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.transaction.Transactional;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.jpa.domain.Specification;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.errors.ResourceNotFoundException;
 import org.springframework.data.domain.*;
@@ -46,13 +52,16 @@ public class RecipeService {
     private final FileStorageService fileStorageService;
     private final InteractionService interactionService;
     private final InteractionProducer interactionProducer;
+    private final ReactionRepository reactionRepository;
+    private final RecipeCommentRepository recipeCommentRepository;
 
     private final String className = this.getClass().getName();
 
     // --- Create / Update Recipe with Media ---
     @Transactional
     public Integer saveRecipeWithMedia(RecipeDTO recipeDTO, List<MultipartFile> files) {
-        if (recipeDTO == null) throw new IllegalArgumentException("RecipeDTO cannot be null");
+        if (recipeDTO == null)
+            throw new IllegalArgumentException("RecipeDTO cannot be null");
 
         Recipe recipe = Optional.ofNullable(recipeDTO.getId())
                 .map(id -> recipeRepository.findById(id)
@@ -63,9 +72,9 @@ public class RecipeService {
             throw new RuntimeException("Author id not found");
 
         }
-            User author = userRepository.findById(recipeDTO.getAuthorId())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-            recipe.setAuthor(author);
+        User author = userRepository.findById(recipeDTO.getAuthorId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        recipe.setAuthor(author);
 
         recipe.setTitle(recipeDTO.getTitle());
         recipe.setDescription(recipeDTO.getDescription());
@@ -112,7 +121,8 @@ public class RecipeService {
         if (files != null && !files.isEmpty()) {
             List<Media> mediaList = new ArrayList<>();
             for (MultipartFile file : files) {
-                String folder = Objects.requireNonNull(file.getContentType()).startsWith("image/") ? "recipe/image" : "recipe/video";
+                String folder = Objects.requireNonNull(file.getContentType()).startsWith("image/") ? "recipe/image"
+                        : "recipe/video";
                 String fileUrl = fileStorageService.upload(file, folder);
 
                 Media media = Media.builder()
@@ -125,13 +135,13 @@ public class RecipeService {
             }
             recipe.getMedia().addAll(mediaList);
         }
-//        interactionService.logInteraction(
-//                author,
-//                ResourceType.RECIPE,
-//                recipe.getId(),
-//                InteractionAction.CREATE,
-//                2.0
-//        );
+        // interactionService.logInteraction(
+        // author,
+        // ResourceType.RECIPE,
+        // recipe.getId(),
+        // InteractionAction.CREATE,
+        // 2.0
+        // );
         interactionProducer.sendInteraction(
                 InteractionEvent.builder()
                         .userId(author.getId())
@@ -139,28 +149,23 @@ public class RecipeService {
                         .resourceId(recipe.getId())
                         .action(InteractionAction.CREATE)
                         .value(4.0)
-                        .build()
-        );
-
+                        .build());
 
         return recipe.getId();
     }
-
-
-
-
 
     // --- Get Recipe by ID ---
     @Transactional
     public RecipeDTO getRecipeById(Integer id) {
 
-//        interactionService.logInteraction(
-//                userRepository.findById(id).orElseThrow(() -> new RuntimeException("User not found")),
-//                ResourceType.RECIPE,
-//                id,
-//                InteractionAction.VIEW,
-//                1.0
-//        );
+        // interactionService.logInteraction(
+        // userRepository.findById(id).orElseThrow(() -> new RuntimeException("User not
+        // found")),
+        // ResourceType.RECIPE,
+        // id,
+        // InteractionAction.VIEW,
+        // 1.0
+        // );
 
         interactionProducer.sendInteraction(
                 InteractionEvent.builder()
@@ -169,8 +174,7 @@ public class RecipeService {
                         .resourceId(id)
                         .action(InteractionAction.VIEW)
                         .value(2.0)
-                        .build()
-        );
+                        .build());
         return recipeRepository.findById(id)
                 .map(recipeMapper::toDTO)
                 .orElseThrow(() -> new ResourceNotFoundException("Recipe not found"));
@@ -188,15 +192,13 @@ public class RecipeService {
     @Transactional
     public Page<RecipeDTO> getAllRecipes(SearchFilter filter) {
         Pageable pageable = PageRequest.of(
-        filter.getPagination() != null ? filter.getPagination().getPage() : 0,
-        filter.getPagination() != null ? filter.getPagination().getSize() : 10,
-                Sort.by(Sort.Direction.fromString(filter.getSortOrder()), filter.getSortBy())
-        );
+                filter.getPagination() != null ? filter.getPagination().getPage() : 0,
+                filter.getPagination() != null ? filter.getPagination().getSize() : 10,
+                Sort.by(Sort.Direction.fromString(filter.getSortOrder()), filter.getSortBy()));
 
         Page<Recipe> recipes = recipeRepository.findAll(
                 RecipeSpecification.buildSpecification(filter),
-                pageable
-        );
+                pageable);
 
         return recipes.map(recipeMapper::toDTO);
     }
@@ -209,6 +211,37 @@ public class RecipeService {
                 .toList();
     }
 
+    // --- Fetch all recipes with pagination (optimized) ---
+    @Transactional
+    public Page<RecipeDTO> findAllRecipesPaginated(int page, int size, String sortBy, String sortOrder) {
+        // Limit size to prevent excessive load
+        size = Math.min(size, 100);
+
+        Sort sort = Sort.by(
+                "DESC".equalsIgnoreCase(sortOrder) ? Sort.Direction.DESC : Sort.Direction.ASC,
+                sortBy);
+
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Page<Recipe> recipes = recipeRepository.findAll(pageable);
+
+        // Map each recipe to DTO and ensure dynamic fields are set
+        return recipes.map(recipe -> {
+            RecipeDTO dto = recipeMapper.toDTO(recipe);
+            // Set authorName from User entity (author_id)
+            if (recipe.getAuthor() != null) {
+                String displayName = recipe.getAuthor().getDisplayName();
+                dto.setAuthorName(
+                        displayName != null && !displayName.isEmpty() ? displayName : recipe.getAuthor().getUsername());
+            } else {
+                dto.setAuthorName("Unknown Chef");
+            }
+            // Set reactionsCount and commentsCount from direct columns
+            dto.setReactionsCount(recipe.getLikeCount() != null ? recipe.getLikeCount() : 0);
+            dto.setCommentsCount(recipe.getCommentCount() != null ? recipe.getCommentCount() : 0);
+            return dto;
+        });
+    }
+
     // --- Fetch recipes by user ---
     @Transactional
     public List<RecipeDTO> getRecipesByUser(Integer userId) {
@@ -217,17 +250,98 @@ public class RecipeService {
                 .toList();
     }
 
-//    public Integer saveRecipe(RecipeDTO recipeDTO) {
+    // --- Fetch recipes by user with pagination ---
+    @Transactional
+    public Page<RecipeDTO> getRecipesByUser(Integer userId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdDate").descending());
+        Page<Recipe> recipePage = recipeRepository.findByAuthorId(userId, pageable);
+        return recipePage.map(recipeMapper::toDTO);
+    }
 
+    // public Integer saveRecipe(RecipeDTO recipeDTO) {
 
+    // \ private List<InstructionDTO> instructions;
+    // private List<IngredientDTO> ingredients;
+    // private List<Tag> tags;
+    // private LocalDateTime createdDate;
+    // private LocalDateTime modifiedDate;
+    // private List<MediaDTO> media;
 
+    // }
 
-//\        private List<InstructionDTO> instructions;
-//        private List<IngredientDTO> ingredients;
-//        private List<Tag> tags;
-//        private LocalDateTime createdDate;
-//        private LocalDateTime modifiedDate;
-//        private List<MediaDTO> media;
+    /**
+     * Return filtered recipes. Originally this used a Redis-backed cache; for now
+     * this implementation fetches a page of recipes and applies simple in-memory
+     * filters.
+     */
+    @Transactional
+    public org.springframework.data.domain.Page<RecipeDTO> getFilteredRecipesFromCache(String cuisine,
+            String difficulty, Integer maxCookTime,
+            String searchTerm, int page, int size) {
+        // Build a DB-level specification for efficient filtering and pagination
+        Specification<Recipe> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new java.util.ArrayList<>();
 
-//    }
+            // Free-text search across title, description and cuisine
+            if (searchTerm != null && !searchTerm.isBlank()) {
+                String likePattern = "%" + searchTerm.toLowerCase() + "%";
+                Predicate titlePredicate = cb.like(cb.lower(root.get("title")), likePattern);
+                Predicate descPredicate = cb.like(cb.lower(root.get("description")), likePattern);
+                Predicate cuisinePredicate = cb.like(cb.lower(root.get("cuisine")), likePattern);
+
+                // join instructions for searching stepDescription
+                Join<?, ?> instrJoin = root.join("instructions", JoinType.LEFT);
+                Predicate instrPredicate = cb.like(cb.lower(instrJoin.get("stepDescription")), likePattern);
+
+                predicates.add(cb.or(titlePredicate, descPredicate, cuisinePredicate, instrPredicate));
+                query.distinct(true);
+            }
+
+            // Exact / range filters
+            if (cuisine != null && !"all".equalsIgnoreCase(cuisine)) {
+                predicates.add(cb.equal(cb.lower(root.get("cuisine")), cuisine.toLowerCase()));
+            }
+
+            // difficulty is not a stored recipe attribute in the current schema; ignore if
+            // provided
+
+            if (maxCookTime != null) {
+                predicates.add(cb.le(root.get("cookTime"), maxCookTime));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        Pageable pageable = PageRequest.of(page, Math.min(size, 100), Sort.by(Sort.Direction.DESC, "createdDate"));
+        Page<Recipe> recipePage = recipeRepository.findAll(spec, pageable);
+
+        // Map to DTOs and set dynamic fields
+        List<RecipeDTO> dtos = recipePage.stream().map(recipe -> {
+            RecipeDTO dto = recipeMapper.toDTO(recipe);
+            if (recipe.getAuthor() != null) {
+                String displayName = recipe.getAuthor().getDisplayName();
+                dto.setAuthorName(
+                        displayName != null && !displayName.isEmpty() ? displayName : recipe.getAuthor().getUsername());
+            } else {
+                dto.setAuthorName("Unknown Chef");
+            }
+            dto.setReactionsCount(recipe.getLikeCount() != null ? recipe.getLikeCount() : 0);
+            dto.setCommentsCount(recipe.getCommentCount() != null ? recipe.getCommentCount() : 0);
+            return dto;
+        }).toList();
+        return new org.springframework.data.domain.PageImpl<>(dtos, recipePage.getPageable(),
+                recipePage.getTotalElements());
+    }
+
+    /**
+     * Cache all recipes to Redis. If a Redis cache is not configured this is a
+     * no-op
+     * and will log the intention. This preserves the controller API while the
+     * caching implementation can be added later.
+     */
+    public void cacheAllRecipesToRedis() {
+        log.info("cacheAllRecipesToRedis called - no Redis cache configured in this build. Skipping caching.");
+        // Future work: serialize all recipes and push to Redis using RedisTemplate or
+        // similar.
+    }
 }
