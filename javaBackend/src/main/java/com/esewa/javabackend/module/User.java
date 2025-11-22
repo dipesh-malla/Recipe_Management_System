@@ -1,6 +1,5 @@
 package com.esewa.javabackend.module;
 
-
 import com.esewa.javabackend.enums.Privacy;
 import com.esewa.javabackend.enums.Role;
 import com.esewa.javabackend.module.base.AuditingEntity;
@@ -43,44 +42,47 @@ public class User extends AuditingEntity {
 
     private boolean isChef;
 
-
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_dietary_preferences", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "preference")
+    @Builder.Default
     private List<String> dietaryPreferences = new ArrayList<>();
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_badges", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "badge")
+    @Builder.Default
     private List<String> badges = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     private Privacy privacySettings;
-
 
     @UpdateTimestamp
     private Instant lastActiveAt;
 
     private boolean verified;
 
-    @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Post> posts = new ArrayList<>();
-
-    @OneToOne(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToOne(mappedBy = "owner")
     private Media profile;
 
     @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Recipe> recipe;
 
     @OneToMany(mappedBy = "followee", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<Follow> followers = new ArrayList<>();
 
     @OneToMany(mappedBy = "follower", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<Follow> following = new ArrayList<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Save> shares = new ArrayList<>();
+    @Builder.Default
+    private List<Share> shares = new ArrayList<>();
 
+    @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Post> posts = new ArrayList<>();
 
     private boolean isNew = true;
 

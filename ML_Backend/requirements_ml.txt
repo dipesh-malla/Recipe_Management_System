@@ -11,7 +11,7 @@ transformers>=4.30.0
 
 # Graph Neural Networks
 torch-geometric>=2.3.0
-dgl>=1.1.0
+# dgl>=1.1.0  # Not available for Python 3.13
 
 # Collaborative Filtering & Matrix Factorization
 implicit>=0.7.0

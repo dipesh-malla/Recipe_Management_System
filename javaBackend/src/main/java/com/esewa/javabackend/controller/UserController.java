@@ -25,6 +25,7 @@ public class UserController extends BaseController {
 
     private final UserService userService;
     private final MediaService mediaService;
+
     public UserController(UserService userService, MediaService mediaService) {
         this.userService = userService;
         this.mediaService = mediaService;
@@ -35,16 +36,13 @@ public class UserController extends BaseController {
         return ResponseEntity.ok(successResponse(
                 userService.saveUser(userDTO),
                 Messages.SUCCESS,
-                "User created"
-        ));
+                "User created"));
     }
-
 
     @PutMapping(value = "/update", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<GlobalApiResponse<?>> updateUserProfile(
             @RequestPart("profile") String profileJSON,
-            @RequestPart(value = "file", required = false) MultipartFile profilePic
-    ) throws JsonProcessingException {
+            @RequestPart(value = "file", required = false) MultipartFile profilePic) throws JsonProcessingException {
         ObjectMapper objectMapper = new ObjectMapper();
         UserProfileDTO profileDTO = objectMapper.readValue(profileJSON, UserProfileDTO.class);
 
@@ -52,39 +50,45 @@ public class UserController extends BaseController {
         return ResponseEntity.ok(successResponse(
                 updatedUser,
                 Messages.SUCCESS,
-                "User updated"
-        ));
+                "User updated"));
     }
 
-//    @PutMapping("/profile-picture")
-//    public ResponseEntity<GlobalApiResponse<?>> uploadProfilePicture(
-//            @RequestParam("userId") Integer userId,
-//            @RequestParam("file") MultipartFile file
-//    ) {
-//        String imageUrl = mediaService.updateUserProfile( file, "profile");
-//        return ResponseEntity.ok(successResponse(imageUrl, Messages.SUCCESS, "Profile picture updated "));
-//    }
-
-
-
+    // @PutMapping("/profile-picture")
+    // public ResponseEntity<GlobalApiResponse<?>> uploadProfilePicture(
+    // @RequestParam("userId") Integer userId,
+    // @RequestParam("file") MultipartFile file
+    // ) {
+    // String imageUrl = mediaService.updateUserProfile( file, "profile");
+    // return ResponseEntity.ok(successResponse(imageUrl, Messages.SUCCESS, "Profile
+    // picture updated "));
+    // }
 
     @GetMapping("/{id}")
     public ResponseEntity<GlobalApiResponse<?>> getUser(@PathVariable Integer id) {
         return ResponseEntity.ok(successResponse(
-                 userService.getUserById(id),
+                userService.getUserById(id),
                 Messages.SUCCESS,
-                "User fetched"
-        ));
+                "User fetched"));
     }
 
     @GetMapping
-    public ResponseEntity<GlobalApiResponse<?>> findAllUser() {
+    public ResponseEntity<GlobalApiResponse<?>> findAllUser(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(successResponse(
-                userService.getAllUsers(),
-                Messages.SUCCESS,
-                "all Users fetched"
-                )
-        );
+                userService.getAllUsers(page, size),
+                Messages.SAVED_SUCCESS));
+    }
+
+    // Dedicated endpoint for Chef Discovery
+    @GetMapping(path = "/chefs")
+    public ResponseEntity<GlobalApiResponse<?>> getChefs(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        // Return only chefs with recipes, sorted by recipe count descending
+        return ResponseEntity.ok(successResponse(
+                userService.getChefsWithRecipes(page, size),
+                Messages.SAVED_SUCCESS));
     }
 
     @DeleteMapping("/{id}")
@@ -102,10 +106,8 @@ public class UserController extends BaseController {
     public ResponseEntity<GlobalApiResponse<?>> getAllUsers(
             @RequestBody GlobalApiRequest<SearchFilter> filterReq) {
         return ResponseEntity.ok(successResponse(
-                 userService.getAllUsers(filterReq.getData()),
+                userService.getAllUsers(filterReq.getData()),
                 Messages.SUCCESS,
-                "Users fetched"
-        ));
+                "Users fetched"));
     }
 }
-

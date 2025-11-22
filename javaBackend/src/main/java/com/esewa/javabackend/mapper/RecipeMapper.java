@@ -30,7 +30,7 @@ public interface RecipeMapper {
 
     // --- Recipe → RecipeDTO ---
     @Mapping(source = "author.id", target = "authorId")
-    @Mapping(target = "isNew", source = "new")
+    @Mapping(expression = "java(recipe.getAuthor() != null ? (recipe.getAuthor().getDisplayName() != null ? recipe.getAuthor().getDisplayName() : recipe.getAuthor().getUsername()) : null)", target = "authorName")
     RecipeDTO toDTO(Recipe recipe);
 
     // --- Instructions mapping ---

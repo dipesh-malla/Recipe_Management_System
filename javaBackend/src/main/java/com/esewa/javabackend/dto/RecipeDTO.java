@@ -12,7 +12,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class    RecipeDTO {
+public class RecipeDTO {
     private Integer id;
     private Integer authorId;
     private String title;
@@ -29,7 +29,8 @@ public class    RecipeDTO {
     private LocalDateTime createdDate;
     private LocalDateTime modifiedDate;
     private List<MediaDTO> media;
-//    private
-
-    private boolean isNew;
+    // Dynamic fields for frontend
+    private String authorName;
+    private int reactionsCount;
+    private int commentsCount;
 }

@@ -1,0 +1,21 @@
+# Repository-level ignores for build artifacts, virtual envs, and IDE files
+
+# Java
+/javaBackend/target/
+
+
+
+# Python
+/ML_Backend/env/
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# IDEs
+/.idea/
+
+# OS
+.DS_Store
+
+# Local env files (do NOT add secrets here if they should be kept)
+*.env

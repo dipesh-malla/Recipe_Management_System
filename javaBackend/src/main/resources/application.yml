@@ -16,7 +16,7 @@ spring:
       max-lifetime: 1800000
   servlet:
     multipart:
-      max-file-size: 50MB      # Maximum size per file (images + videos)
+      max-file-size: 50MB # Maximum size per file (images + videos)
       max-request-size: 100MB
 
   jpa:
@@ -31,7 +31,7 @@ spring:
     open-in-view: false
 
   kafka:
-    bootstrap-servers:  127.0.0.1:9092
+    bootstrap-servers: kafka:9092
     consumer:
       group-id: notification-group, interaction-group
       auto-offset-reset: earliest
@@ -72,5 +72,18 @@ spring:
   data:
     redis:
       host: localhost
-      port: 6379
+      port: 6380
       timeout: 60000
+
+# -------------------------------
+# ML Backend Configuration
+# -------------------------------
+ml:
+  backend:
+    enabled: true
+    url: http://localhost:8000
+    api-path: /api
+    connect-timeout: 5000
+    read-timeout: 30000
+    max-total-connections: 100
+    max-per-route: 50

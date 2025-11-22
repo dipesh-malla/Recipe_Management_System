@@ -7,8 +7,8 @@ import com.esewa.javabackend.dto.UserDTO.UserResponseDTO;
 import com.esewa.javabackend.dto.aiml.AIMLDataDTO;
 import com.esewa.javabackend.dto.postDTO.PostResponseDTO;
 import com.esewa.javabackend.service.*;
-import com.esewa.javabackend.service.AIML.AIMLService;
-import com.esewa.javabackend.service.AIML.DatasetImportService;
+// Temporarily disabled due to compilation errors
+// import com.esewa.javabackend.service.AIML.DatasetImportService;
 import com.esewa.javabackend.service.AIML.EmbeddingService;
 import com.esewa.javabackend.service.AIML.InteractionService;
 import lombok.RequiredArgsConstructor;
@@ -33,8 +33,8 @@ public class AIMLDataController {
     private final InteractionService interactionService;
     private final FollowService followService;
     private final EmbeddingService embeddingService;
-    private final DatasetImportService datasetImportService;
-    private final AIMLService aimlService;
+    // Temporarily disabled due to compilation errors
+    // private final DatasetImportService datasetImportService;
 
     /**
      * Get complete dataset for ML training
@@ -74,39 +74,46 @@ public class AIMLDataController {
      * @param file The JSON file containing the dataset
      * @return Import statistics including number of records imported
      */
-    @PostMapping(value = "/dataset/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<Map<String, Object>> importDataset(@RequestParam("file") MultipartFile file) {
-        log.info("Received dataset import request: {}", file.getOriginalFilename());
-
-        try {
-            if (file.isEmpty()) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("success", false, "error", "File is empty"));
-            }
-
-            if (!file.getOriginalFilename().endsWith(".json")) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("success", false, "error", "File must be JSON format"));
-            }
-
-            Map<String, Object> stats = datasetImportService.importDatasetFromUpload(file);
-
-            if ((Boolean) stats.get("success")) {
-                log.info("Dataset import completed successfully");
-                return ResponseEntity.ok(stats);
-            } else {
-                log.error("Dataset import failed: {}", stats.get("error"));
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(stats);
-            }
-
-        } catch (Exception e) {
-            log.error("Error importing dataset", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "success", false,
-                            "error", e.getMessage()));
-        }
-    }
+    /*
+     * Temporarily disabled due to DatasetImportService compilation errors
+     * 
+     * @PostMapping(value = "/dataset/import", consumes =
+     * MediaType.MULTIPART_FORM_DATA_VALUE)
+     * public ResponseEntity<Map<String, Object>>
+     * importDataset(@RequestParam("file") MultipartFile file) {
+     * log.info("Received dataset import request: {}", file.getOriginalFilename());
+     * 
+     * try {
+     * if (file.isEmpty()) {
+     * return ResponseEntity.badRequest()
+     * .body(Map.of("success", false, "error", "File is empty"));
+     * }
+     * 
+     * if (!file.getOriginalFilename().endsWith(".json")) {
+     * return ResponseEntity.badRequest()
+     * .body(Map.of("success", false, "error", "File must be JSON format"));
+     * }
+     * 
+     * Map<String, Object> stats =
+     * datasetImportService.importDatasetFromUpload(file);
+     * 
+     * if ((Boolean) stats.get("success")) {
+     * log.info("Dataset import completed successfully");
+     * return ResponseEntity.ok(stats);
+     * } else {
+     * log.error("Dataset import failed: {}", stats.get("error"));
+     * return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(stats);
+     * }
+     * 
+     * } catch (Exception e) {
+     * log.error("Error importing dataset", e);
+     * return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+     * .body(Map.of(
+     * "success", false,
+     * "error", e.getMessage()));
+     * }
+     * }
+     */
 
     /**
      * Import ML dataset from JSON string
@@ -115,39 +122,50 @@ public class AIMLDataController {
      * @param jsonData The JSON string containing the dataset
      * @return Import statistics
      */
-    @PostMapping(value = "/dataset/import-json", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Map<String, Object>> importDatasetJson(@RequestBody String jsonData) {
-        log.info("Received dataset import request from JSON string");
-
-        try {
-            Map<String, Object> stats = datasetImportService.importDatasetFromString(jsonData);
-
-            if ((Boolean) stats.get("success")) {
-                log.info("Dataset import completed successfully");
-                return ResponseEntity.ok(stats);
-            } else {
-                log.error("Dataset import failed: {}", stats.get("error"));
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(stats);
-            }
-
-        } catch (Exception e) {
-            log.error("Error importing dataset", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "success", false,
-                            "error", e.getMessage()));
-        }
-    }
+    /*
+     * Temporarily disabled due to DatasetImportService compilation errors
+     * 
+     * @PostMapping(value = "/dataset/import-json", consumes =
+     * MediaType.APPLICATION_JSON_VALUE)
+     * public ResponseEntity<Map<String, Object>> importDatasetJson(@RequestBody
+     * String jsonData) {
+     * log.info("Received dataset import request from JSON string");
+     * 
+     * try {
+     * Map<String, Object> stats =
+     * datasetImportService.importDatasetFromString(jsonData);
+     * 
+     * if ((Boolean) stats.get("success")) {
+     * log.info("Dataset import completed successfully");
+     * return ResponseEntity.ok(stats);
+     * } else {
+     * log.error("Dataset import failed: {}", stats.get("error"));
+     * return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(stats);
+     * }
+     * 
+     * } catch (Exception e) {
+     * log.error("Error importing dataset", e);
+     * return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+     * .body(Map.of(
+     * "success", false,
+     * "error", e.getMessage()));
+     * }
+     * }
+     */
 
     /**
      * Get current dataset statistics
      * Returns counts of all entities in the database
      */
-    @GetMapping("/dataset/stats")
-    public ResponseEntity<Map<String, Long>> getDatasetStatistics() {
-        log.info("Fetching dataset statistics");
-        return ResponseEntity.ok(datasetImportService.getDatasetStatistics());
-    }
+    /*
+     * Temporarily disabled due to DatasetImportService compilation errors
+     * 
+     * @GetMapping("/dataset/stats")
+     * public ResponseEntity<Map<String, Long>> getDatasetStatistics() {
+     * log.info("Fetching dataset statistics");
+     * return ResponseEntity.ok(datasetImportService.getDatasetStatistics());
+     * }
+     */
 
     /**
      * Clear all ML data from database
@@ -155,21 +173,25 @@ public class AIMLDataController {
      * and embeddings
      * Use with extreme caution!
      */
-    @DeleteMapping("/dataset/clear")
-    public ResponseEntity<Map<String, String>> clearDataset() {
-        log.warn("Received request to clear all dataset");
-
-        try {
-            datasetImportService.clearAllData();
-            return ResponseEntity.ok(Map.of(
-                    "success", "true",
-                    "message", "All dataset cleared successfully"));
-        } catch (Exception e) {
-            log.error("Error clearing dataset", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "success", "false",
-                            "error", e.getMessage()));
-        }
-    }
+    /*
+     * Temporarily disabled due to DatasetImportService compilation errors
+     * 
+     * @DeleteMapping("/dataset/clear")
+     * public ResponseEntity<Map<String, String>> clearDataset() {
+     * log.warn("Received request to clear all dataset");
+     * 
+     * try {
+     * datasetImportService.clearAllData();
+     * return ResponseEntity.ok(Map.of(
+     * "success", "true",
+     * "message", "All dataset cleared successfully"));
+     * } catch (Exception e) {
+     * log.error("Error clearing dataset", e);
+     * return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+     * .body(Map.of(
+     * "success", "false",
+     * "error", e.getMessage()));
+     * }
+     * }
+     */
 }
