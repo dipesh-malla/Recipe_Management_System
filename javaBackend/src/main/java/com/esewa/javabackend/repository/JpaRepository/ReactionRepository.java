@@ -6,8 +6,15 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
 
 @Repository
 public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
     Optional<Reaction> findByPostIdAndUserId(Integer postId, Integer userId);
+
+    // New method to count reactions for a given recipe
+    int countByRecipeId(Integer recipeId);
+
+    // Optionally, fetch all reactions for a recipe
+    List<Reaction> findByRecipeId(Integer recipeId);
 }
