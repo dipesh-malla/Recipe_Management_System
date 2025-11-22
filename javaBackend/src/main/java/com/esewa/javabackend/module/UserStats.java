@@ -21,11 +21,14 @@ public class UserStats {
     private User user;
 
     @Column(nullable = false)
+    @Builder.Default
     private int recipeCount = 0;
 
     @Column(nullable = false)
+    @Builder.Default
     private int followersCount = 0;
 
     @Column(nullable = false)
+    @Builder.Default
     private int followingCount = 0;
 }

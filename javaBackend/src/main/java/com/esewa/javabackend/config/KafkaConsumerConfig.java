@@ -37,13 +37,10 @@ public class KafkaConsumerConfig {
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, NotificationEvent> notificationKafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, NotificationEvent> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
+        ConcurrentKafkaListenerContainerFactory<String, NotificationEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(notificationConsumerFactory());
         return factory;
     }
-
-
 
     @Bean
     public ConsumerFactory<String, InteractionEvent> interactionConsumerFactory() {
@@ -63,11 +60,9 @@ public class KafkaConsumerConfig {
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, InteractionEvent> interactionKafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, InteractionEvent> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
+        ConcurrentKafkaListenerContainerFactory<String, InteractionEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(interactionConsumerFactory());
         return factory;
     }
 
 }
-
