@@ -14,7 +14,8 @@ public class UserStatDTO {
     private Integer id;
     private Integer userId;
     private boolean active;
-    private int followerCount;
+    private int followersCount; // Changed from followerCount to match entity
     private int followingCount;
+    private int recipeCount; // Added recipeCount
     private LocalDateTime lastLogin;
 }
