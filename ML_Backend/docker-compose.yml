@@ -85,15 +85,42 @@ services:
       - "9092:9092"
       - "29092:29092"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
     volumes:
       - kafka-data:/var/lib/kafka/data
+    networks:
+      - recipe-network
+    restart: unless-stopped
+
+  recipe-frontend:
+    build:
+      context: ../Recipe_frontend/recipe_frontend
+    container_name: recipe-frontend
+    ports:
+      - "3001:8080"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - ml-backend
+    networks:
+      - recipe-network
+    restart: unless-stopped
+
+  java-backend:
+    build:
+      context: ../javaBackend
+      dockerfile: Dockerfile
+    container_name: recipe-java-backend
+    ports:
+      - "8090:8090"
+    environment:
+      SPRING_PROFILES_ACTIVE: default
     networks:
       - recipe-network
     restart: unless-stopped

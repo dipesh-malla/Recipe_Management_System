@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     CACHE_ENABLED: bool = True
     
     # Kafka Configuration
-    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"  # Can be comma-separated for multiple servers
+    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
     KAFKA_INTERACTIONS_TOPIC: str = "interactions"
     KAFKA_CONSUMER_GROUP: str = "ml-backend-consumer"
     KAFKA_AUTO_OFFSET_RESET: str = "latest"
@@ -58,9 +58,16 @@ class Settings(BaseSettings):
     
     # ML Model Configuration
     DEFAULT_TOP_K: int = 10
-    MAX_BATCH_SIZE: int = 100
+    MAX_BATCH_SIZE: int = 50
     EMBEDDING_DIM: int = 128
     DEVICE: str = "cpu"  # or "cuda" if GPU available
+
+    # PostgreSQL Configuration
+    POSTGRES_HOST: str
+    POSTGRES_PORT: int
+    POSTGRES_DB: str
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
     
     # Recommendation Settings
     MMR_DIVERSITY_WEIGHT: float = 0.3  # lambda for MMR (1-alpha in diversity formula)
