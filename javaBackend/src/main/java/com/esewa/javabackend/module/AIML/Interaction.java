@@ -40,6 +40,9 @@ public class Interaction {
 
     @CreationTimestamp
     private Instant createdAt;
+
+
+    private boolean isNew = true;
 }
 
 

@@ -14,6 +14,7 @@ public interface UserMapper {
     @Mapping(target = "profile.id", source = "profile.id")
     @Mapping(target = "profile.url", source = "profile.url")
     @Mapping(target = "profile.type", source = "profile.type")
+    @Mapping(source = "new" , target = "isNew")
     UserResponseDTO toDTO(User user);
 
     @Mapping(source = "id", target = "id")
