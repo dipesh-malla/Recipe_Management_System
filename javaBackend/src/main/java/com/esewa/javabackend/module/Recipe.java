@@ -30,7 +30,7 @@ public class Recipe extends AuditingEntity {
 
     @Column(columnDefinition = "TEXT")
     private String description;
-//
+    //
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Instruction> instructions = new ArrayList<>();
 
@@ -40,10 +40,8 @@ public class Recipe extends AuditingEntity {
     private String cuisine;
     private boolean isPublic = true;
 
-
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Media> media = new ArrayList<>();
-
 
     @Enumerated(EnumType.STRING)
     private ModerationStatus moderationStatus = ModerationStatus.PENDING;
@@ -51,11 +49,16 @@ public class Recipe extends AuditingEntity {
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RecipeComment> comments = new ArrayList<>();
 
-
-
-    @OneToMany(mappedBy= "recipe",  cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Ingredients> ingredients = new ArrayList<>();
 
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Tag> tags = new ArrayList<>();
+
+    // Direct count columns
+    @Column(name = "like_count")
+    private Integer likeCount;
+
+    @Column(name = "comment_count")
+    private Integer commentCount;
 }
