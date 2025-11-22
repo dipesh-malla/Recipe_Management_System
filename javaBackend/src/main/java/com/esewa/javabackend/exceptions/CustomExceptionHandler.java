@@ -20,14 +20,35 @@ public class CustomExceptionHandler extends BaseController {
 
     @ExceptionHandler(AppException.class)
     public ResponseEntity<?> handleMethodArgumentNotValidException(AppException ex) {
-        String message = Objects.nonNull(ex.getMessageCode()) ?
-                messageSource.getMessage(String.valueOf(ex.getMessageCode()), ex.getArgs()):ex.getMessage();
-        log.error(message,ex);
+        String message = Objects.nonNull(ex.getMessageCode())
+                ? messageSource.getMessage(String.valueOf(ex.getMessageCode()), ex.getArgs())
+                : ex.getMessage();
+        log.error(message, ex);
         HttpStatus httpStatus = HttpStatus.valueOf(ex.getStatus());
         return ResponseEntity.status(httpStatus)
                 .body(errorResponse(message, httpStatus));
+    }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<?> handleIllegalStateException(IllegalStateException ex) {
+        log.error("Illegal state error: {}", ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(errorResponse(ex.getMessage(), HttpStatus.CONFLICT));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<?> handleIllegalArgumentException(IllegalArgumentException ex) {
+        log.error("Illegal argument error: {}", ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(errorResponse(ex.getMessage(), HttpStatus.BAD_REQUEST));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> handleGeneralException(Exception ex) {
+        log.error("Unexpected error: {}", ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(errorResponse("An unexpected error occurred: " + ex.getMessage(),
+                        HttpStatus.INTERNAL_SERVER_ERROR));
     }
 
 }
-

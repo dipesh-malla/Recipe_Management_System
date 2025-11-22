@@ -6,7 +6,7 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public enum Messages {
-    SUCCESS( "request.success"),
+    SUCCESS("request.success"),
     INVALID("request.invalid"),
     INTERNAL_SERVER_ERROR("internal.server.error"),
     RESOURCES_ALREADY_EXISTS("resource.already.exists"),
@@ -14,7 +14,7 @@ public enum Messages {
     NOT_ALLOWED("not.allowed"),
     REQUIRED("required"),
     SAVED_SUCCESS("saved.success"),
-    UPDATE_SUCCESS("update.success"),;
+    UPDATE_SUCCESS("update.success");
+
     final String code;
 }
-
