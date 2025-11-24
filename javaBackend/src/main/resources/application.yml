@@ -52,6 +52,7 @@ spring:
     username: dipeshmalla
     password: dipeshmalla
 
+
   mail:
     host: localhost
     port: 1025
