@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # ML Backend API Service
+  ml-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: recipe-ml-backend
+    ports:
+      - "8000:8000"
+      - "9090:9090"  # Prometheus metrics
+    environment:
+      # Application
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      
+      # Java Backend Integration
+      - JAVA_BACKEND_URL=http://java-backend:8080
+      
+      # Redis
+      - REDIS_URL=redis://redis:6379/0
+      - CACHE_ENABLED=true
+      - CACHE_TTL=3600
+      
+      # Kafka
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_INTERACTIONS_TOPIC=interactions
+      - KAFKA_ENABLED=true
+      
+      # Model Settings
+      - DEVICE=cpu
+      - PRECOMPUTE_EMBEDDINGS=true
+      - MAX_BATCH_SIZE=100
+    volumes:
+      - ./RecipeML:/app/RecipeML:ro  # Mount models as read-only
+    depends_on:
+      - redis
+      - kafka
+      - zookeeper
+    networks:
+      - recipe-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: recipe-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - recipe-network
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+
+  # Zookeeper (required for Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: recipe-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    networks:
+      - recipe-network
+    restart: unless-stopped
+
+  # Kafka
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: recipe-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - recipe-network
+    restart: unless-stopped
+
+  recipe-frontend:
+    build:
+      context: ../Recipe_frontend/recipe_frontend
+    container_name: recipe-frontend
+    ports:
+      - "3001:8080"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - ml-backend
+    networks:
+      - recipe-network
+    restart: unless-stopped
+
+  java-backend:
+    build:
+      context: ../javaBackend
+      dockerfile: Dockerfile
+    container_name: recipe-java-backend
+    ports:
+      - "8090:8090"
+    environment:
+      SPRING_PROFILES_ACTIVE: default
+    networks:
+      - recipe-network
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  zookeeper-data:
+  zookeeper-logs:
+  kafka-data:
+
+networks:
+  recipe-network:
+    driver: bridge
+

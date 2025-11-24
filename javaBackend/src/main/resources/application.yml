@@ -1,0 +1,88 @@
+server:
+  port: 8090
+spring:
+  datasource:
+    url: jdbc:postgresql://dpg-d4hisjemcj7s73c2och0-a.singapore-postgres.render.com:5432/recipe_sh82
+    username: recipe_sh82_user
+    password: pmpooOr3Ue2nUhdaAPPjmpnwh5CKmvcJ
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 5
+      idle-timeout: 600000
+      connection-timeout: 30000
+      max-lifetime: 1800000
+  servlet:
+    multipart:
+      max-file-size: 50MB # Maximum size per file (images + videos)
+      max-request-size: 100MB
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        show_sql: true
+        jdbc:
+          batch_size: 50
+    open-in-view: false
+
+  kafka:
+    bootstrap-servers: kafka:9092
+    consumer:
+      group-id: notification-group, interaction-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+    # -------------------------------
+    # Elasticsearch
+    # -------------------------------
+  elasticsearch:
+    uris: http://localhost:9200
+    connection-timeout: 5s
+    socket-timeout: 10s
+    username: dipeshmalla
+    password: dipeshmalla
+
+  mail:
+    host: localhost
+    port: 1025
+    username: dipeshmalla
+    password: dipeshmalla
+    properties:
+      mail:
+        smtp:
+          trust: "*"
+        auth: true
+        starttls:
+          enable: true
+        timeout: 5000
+        connectiontimeout: 5000
+        writetimeout: 5000
+
+  data:
+    redis:
+      host: localhost
+      port: 6380
+      timeout: 60000
+
+# -------------------------------
+# ML Backend Configuration
+# -------------------------------
+ml:
+  backend:
+    enabled: true
+    url: http://localhost:8000
+    api-path: /api
+    connect-timeout: 5000
+    read-timeout: 30000
+    max-total-connections: 100
+    max-per-route: 50
