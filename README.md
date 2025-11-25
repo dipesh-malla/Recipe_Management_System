@@ -1,47 +1,46 @@
-# 🎊 Recipe Management System - Integration Complete!
+# RecipeShare - Recipe Management System
 
-> **Full-Stack Integration Successfully Completed**  
-> Frontend (React) ↔️ Backend (Spring Boot) ↔️ Database (PostgreSQL)
-
----
-
-## 📢 Important Notice
-
-**Your Recipe Management System is now fully integrated and ready to use!**
-
-All services have been properly configured to communicate seamlessly:
-
-- ✅ CORS configured
-- ✅ API client updated
-- ✅ Environment variables set
-- ✅ Health monitoring enabled
-- ✅ Startup scripts created
-- ✅ Comprehensive documentation provided
+> **Full-Stack Application**  
+> Frontend (React) ↔️ Backend (Spring Boot & FastAPI) ↔️ Database (PostgreSQL)
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Docker-first)
 
-### **Start Everything with One Command**
+This project is optimized for local development with Docker Compose. The repository contains a root `docker-compose.yml` that brings up the primary services (Postgres, Kafka, Redis, Elasticsearch and dev mail). For ML development there is a focused compose at `ML_Backend/docker-compose.yml` (ml-backend + Redis + Kafka).
 
-```powershell
-# From the project root directory
-.\start-dev.ps1
+Prerequisites
+
+- Docker (20.x+) and Docker Compose (v2) installed
+- Recommended: 8+ GB RAM available for local stack
+
+Start the full stack (recommended)
+
+```bash
+# From the repository root
+docker compose up -d --build
+
+# Tail logs (optional)
+docker compose logs -f
 ```
 
-This will automatically:
+Start only the ML stack (ml-backend + Redis + Kafka) for ML development:
 
-1. Check prerequisites
-2. Start PostgreSQL
-3. Start Java Backend (port 8090)
-4. Start Frontend (port 8080)
-5. Open browser
-
-### **Or Use Quick Start** (faster for daily use)
-
-```powershell
-.\quick-start.ps1
+```bash
+docker compose -f ML_Backend/docker-compose.yml up --build -d
+docker compose -f ML_Backend/docker-compose.yml logs -f ml-backend
 ```
+
+Stop and remove containers
+
+```bash
+docker compose down --volumes
+```
+
+Notes
+
+- The root compose starts services on these default ports: Postgres `5432`, Kafka `9092`, Elasticsearch `9200`, Redis `6380` (host), Frontend/Backend ports are configured by service images and environment variables.
+- If you prefer running services locally without Docker, see the Development section lower in this document.
 
 ---
 
@@ -57,6 +56,35 @@ Once started, access these URLs:
 | **Health Check**    | http://localhost:8090/api/health    | Backend status   |
 
 ---
+
+## 🐳 Docker — Build & run specific services
+
+You can build and run the frontend/backend artifacts as Docker images if you want to reproduce production packaging locally.
+
+Build backend image (from `javaBackend`):
+
+```bash
+cd javaBackend
+./mvnw -DskipTests clean package
+docker build -t recipes-java-backend:local .
+```
+
+Build frontend image (from `Recipe_frontend/recipe_frontend`):
+
+```bash
+cd Recipe_frontend/recipe_frontend
+pnpm install
+pnpm run build
+docker build -t recipes-frontend:local .
+```
+
+Run the images with Docker Compose by referencing overrides or by editing the root `docker-compose.yml` to use the built `image:` names.
+
+Healthchecks & logs
+
+- Inspect running containers: `docker ps`
+- View logs for a container: `docker logs -f <container-name>`
+- Check service health endpoints (backend: `/api/health`, ML: `/api/health`)
 
 ## 📚 Documentation
 
@@ -180,7 +208,7 @@ We've created comprehensive documentation for you:
        ▼
 ┌─────────────┐
 │ PostgreSQL  │  postgresql://localhost:5432
-│  Database   │  recipe_db
+│  Database   │  recipe_sh82
 └─────────────┘
 ```
 
@@ -280,31 +308,43 @@ DELETE /api/posts/delete?id={id}
 
 ---
 
-## 🎓 Development Workflow
+## 🎓 Development Workflow (recommended)
 
-1. **Start Services**
+We recommend using Docker Compose for an environment that closely matches production. For fast frontend/back development you can run only the services you need.
 
-   ```powershell
-   .\quick-start.ps1
-   ```
+1. Start the full stack (recommended):
 
-2. **Make Changes**
+```bash
+docker compose up -d --build
+```
 
-   - Edit frontend or backend files
-   - Changes auto-reload
+2. Frontend hot-reload (if developing UI only):
 
-3. **Test Changes**
+```bash
+cd Recipe_frontend/recipe_frontend
+pnpm install
+pnpm run dev
+```
 
-   - Check browser (frontend)
-   - Check terminal logs (backend)
-   - Use System Status page
+3. Backend development (Spring Boot):
 
-4. **Commit Changes**
-   ```bash
-   git add .
-   git commit -m "Your message"
-   git push
-   ```
+```bash
+cd javaBackend
+./mvnw spring-boot:run
+```
+
+4. Test and iterate
+
+- Use Postman or curl to exercise APIs
+- Check logs via `docker compose logs -f` or `./mvnw spring-boot:run` terminal
+
+5. Commit and push changes
+
+```bash
+git add .
+git commit -m "Short description"
+git push
+```
 
 ---
 
@@ -415,15 +455,15 @@ Recipe_Management_System/
 
 ## 🏆 What Makes This Integration Professional
 
-✅ **Separation of Concerns** - Frontend and backend properly decoupled  
-✅ **Security** - CORS configured, authentication implemented  
-✅ **Developer Experience** - One-command startup, clear docs  
-✅ **Error Handling** - Comprehensive error messages  
-✅ **Monitoring** - Health checks and status dashboard  
-✅ **Scalability** - Environment-based configuration  
-✅ **Documentation** - Complete guides for all scenarios  
-✅ **Testing** - Verification scripts included  
-✅ **Maintainability** - Clean structure, clear comments
+- ✅ **Separation of Concerns** - Frontend and backend properly decoupled
+- ✅ **Security** - CORS configured, authentication implemented
+- ✅ **Developer Experience** - One-command startup, clear docs
+- ✅ **Error Handling** - Comprehensive error messages
+- ✅ **Monitoring** - Health checks and status dashboard
+- ✅ **Scalability** - Environment-based configuration
+- ✅ **Documentation** - Complete guides for all scenarios
+- ✅ **Testing** - Verification scripts included
+- ✅ **Maintainability** - Clean structure, clear comments
 
 ---
 
@@ -469,3 +509,41 @@ Then open: http://localhost:8080
 ---
 
 **Made with ❤️ and expert craftsmanship**
+
+## Architecture diagram
+
+A visual diagram of the system architecture is included in `docs/`. Open the file or view it in your code browser:
+
+![Architecture diagram](./docs/architecture.svg)
+
+## ML Backend — local compose (focused)
+
+To run the ML backend with its required infrastructure (Redis + Kafka) for local development use the focused compose file added at `ML_Backend/docker-compose.yml`.
+
+From the repository root:
+
+```bash
+# Start the ML stack (ml-backend, redis, kafka, zookeeper)
+docker compose -f ML_Backend/docker-compose.yml up --build -d
+
+# View logs
+docker compose -f ML_Backend/docker-compose.yml logs -f ml-backend
+```
+
+Verify the ML API is responding:
+
+```bash
+curl -X POST http://localhost:8000/api/recommendations/recipes \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": 42, "top_k": 8}'
+```
+
+Notes:
+
+- The compose file uses `confluentinc/cp-kafka` and `confluentinc/cp-zookeeper` images for a simple local Kafka. This is a development setup only — for production use a managed Kafka or production-hardened cluster.
+- `REDIS_URL` and `KAFKA_BOOTSTRAP_SERVERS` are set for the `ml-backend` service inside the compose file.
+
+Files added:
+
+- `docs/architecture.svg` — vector diagram for the system architecture.
+- `ML_Backend/docker-compose.yml` — focused compose file to run ML dependencies locally.
