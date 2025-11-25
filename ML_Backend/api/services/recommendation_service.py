@@ -49,18 +49,20 @@ class RecommendationService:
         )
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                                # Join recipes and users, select like_count, and count comments
-                                  sql = """
-                                  SELECT r.id, r.title, r.cuisine, r.dietary_type, r.cook_time, r.difficulty, r.calories_per_serving, r.avg_rating,
-                                      u.display_name AS chef, r.like_count, r.comment_count,
-                                      (SELECT COUNT(*) FROM recipe_comments rc WHERE rc.recipe_id = r.id) AS comments
-                                  FROM recipes r
-                                  LEFT JOIN users u ON r.author_id = u.id
-                                  WHERE r.id = ANY(%s)
-                                  """
-                                  cur.execute(sql, (list(recipe_ids),))
-                                  rows = cur.fetchall()
-                                  return {row['id']: row for row in rows}
+                # Ensure all IDs are native Python ints (psycopg2 can't adapt numpy types)
+                py_ids = [int(x) for x in list(recipe_ids)]
+                # Join recipes and users, select like_count, and count comments
+                sql = """
+                SELECT r.id, r.title, r.cuisine, r.dietary_type, r.cook_time, r.difficulty, r.calories_per_serving, r.avg_rating,
+                    u.display_name AS chef, r.like_count, r.comment_count,
+                    (SELECT COUNT(*) FROM recipe_comments rc WHERE rc.recipe_id = r.id) AS comments
+                FROM recipes r
+                LEFT JOIN users u ON r.author_id = u.id
+                WHERE r.id = ANY(%s)
+                """
+                cur.execute(sql, (py_ids,))
+                rows = cur.fetchall()
+                return {row['id']: row for row in rows}
         finally:
             conn.close()
     @staticmethod
@@ -668,6 +670,58 @@ class RecommendationService:
                 raise ValueError(f"No model available for user similarity")
         
         raise ValueError("No model available for user similarity")
+
+    async def get_similar_recipes(self, recipe_id: int, top_k: int = 10) -> Tuple[List[RecipeRecommendation], str, float]:
+        """
+        Find similar recipes based on recipe embeddings from Two-Tower model.
+
+        Returns:
+            Tuple of (recommendations, model_used, latency_ms)
+        """
+        start_time = time.time()
+
+        # Ensure recipe embeddings are available
+        if self.model_loader.recipe_embeddings is None or self.model_loader.recipe_ids_tensor is None:
+            raise ValueError("Recipe embeddings are not precomputed on the model loader")
+
+        # Map recipe_id to internal index
+        if self.model_loader.recipe_id_mapping is None or recipe_id not in self.model_loader.recipe_id_mapping:
+            raise ValueError(f"Recipe ID {recipe_id} not found in mappings")
+
+        internal_idx = self.model_loader.recipe_id_mapping[recipe_id]
+
+        # Find position of internal_idx within recipe_ids_tensor
+        import numpy as np
+        recipe_indices_np = self.model_loader.recipe_ids_tensor.cpu().numpy()
+        matches = np.where(recipe_indices_np == internal_idx)[0]
+        if len(matches) == 0:
+            raise ValueError(f"Recipe internal index for {recipe_id} not present in precomputed embeddings")
+
+        target_pos = matches[0]
+        # Compute cosine similarity between target embedding and all embeddings
+        emb_np = self.model_loader.recipe_embeddings.cpu().numpy()
+        target_emb = emb_np[target_pos]
+        # Cosine similarity
+        norms = np.linalg.norm(emb_np, axis=1) * np.linalg.norm(target_emb) + 1e-8
+        sims = np.dot(emb_np, target_emb) / norms
+
+        # Exclude the target itself
+        sims[target_pos] = -1.0
+
+        # Get top-k indices
+        top_k = min(top_k, len(sims))
+        top_idxs = np.argsort(sims)[::-1][:top_k]
+
+        # Map back to recipe IDs
+        top_internal_ids = recipe_indices_np[top_idxs]
+        top_recipe_ids = [self.model_loader.reverse_recipe_mapping[int(x)] for x in top_internal_ids]
+        top_scores = sims[top_idxs].tolist()
+
+        # Build recommendation objects
+        recommendations = self._build_recommendations(top_recipe_ids, top_scores, model_used="two_tower_similar")
+        latency_ms = (time.time() - start_time) * 1000
+
+        return recommendations, "two_tower_similar", latency_ms
     
     def _find_similar_users_two_tower(
         self,
