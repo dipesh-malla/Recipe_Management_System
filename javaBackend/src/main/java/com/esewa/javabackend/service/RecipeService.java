@@ -38,6 +38,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 @Service
 @Transactional
@@ -69,9 +71,73 @@ public class RecipeService {
                 .orElseGet(Recipe::new);
 
         if (recipeDTO.getAuthorId() == null) {
-            throw new RuntimeException("Author id not found");
-
+            // Attempt to resolve authenticated user id via reflection to avoid a
+            // compile-time dependency on Spring Security. If Spring Security is not
+            // present on the classpath this will silently no-op and the service will
+            // continue to throw the author's missing error as before.
+            try {
+                Class<?> sch = Class.forName("org.springframework.security.core.context.SecurityContextHolder");
+                Object context = sch.getMethod("getContext").invoke(null);
+                if (context != null) {
+                    Object auth = context.getClass().getMethod("getAuthentication").invoke(context);
+                    if (auth != null) {
+                        Object principal = null;
+                        try {
+                            principal = auth.getClass().getMethod("getPrincipal").invoke(auth);
+                        } catch (NoSuchMethodException nsme) {
+                            // ignore - can't get principal
+                        }
+                        if (principal != null) {
+                            if (principal instanceof String) {
+                                try {
+                                    recipeDTO.setAuthorId(Integer.valueOf(((String) principal).trim()));
+                                } catch (NumberFormatException ignored) {
+                                }
+                            } else {
+                                // Try common getter names on principal objects (getId, getUserId,
+                                // getUsername)
+                                try {
+                                    java.lang.reflect.Method m = principal.getClass().getMethod("getId");
+                                    Object idVal = m.invoke(principal);
+                                    if (idVal instanceof Number) {
+                                        recipeDTO.setAuthorId(((Number) idVal).intValue());
+                                    }
+                                } catch (NoSuchMethodException e1) {
+                                    try {
+                                        java.lang.reflect.Method m2 = principal.getClass().getMethod("getUserId");
+                                        Object idVal = m2.invoke(principal);
+                                        if (idVal instanceof Number) {
+                                            recipeDTO.setAuthorId(((Number) idVal).intValue());
+                                        }
+                                    } catch (NoSuchMethodException e2) {
+                                        try {
+                                            java.lang.reflect.Method m3 = principal.getClass().getMethod("getUsername");
+                                            Object uname = m3.invoke(principal);
+                                            if (uname != null) {
+                                                try {
+                                                    recipeDTO.setAuthorId(Integer.valueOf(uname.toString()));
+                                                } catch (NumberFormatException ignored) {
+                                                }
+                                            }
+                                        } catch (NoSuchMethodException ignored) {
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (ClassNotFoundException cnfe) {
+                // Security not on classpath — that's fine in local/dev. Let the
+                // subsequent null-check throw the original error.
+            } catch (Exception ignored) {
+            }
         }
+
+        if (recipeDTO.getAuthorId() == null) {
+            throw new RuntimeException("Author id not found");
+        }
+
         User author = userRepository.findById(recipeDTO.getAuthorId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         recipe.setAuthor(author);
@@ -142,14 +208,19 @@ public class RecipeService {
         // InteractionAction.CREATE,
         // 2.0
         // );
-        interactionProducer.sendInteraction(
-                InteractionEvent.builder()
-                        .userId(author.getId())
-                        .resourceType(ResourceType.RECIPE)
-                        .resourceId(recipe.getId())
-                        .action(InteractionAction.CREATE)
-                        .value(4.0)
-                        .build());
+        try {
+            interactionProducer.sendInteraction(
+                    InteractionEvent.builder()
+                            .userId(author.getId())
+                            .resourceType(ResourceType.RECIPE)
+                            .resourceId(recipe.getId())
+                            .action(InteractionAction.CREATE)
+                            .value(4.0)
+                            .build());
+        } catch (Exception e) {
+            // If Kafka producer can't be constructed or send fails, log and continue
+            log.warn("Interaction producer failed during recipe create: {}", e.getMessage());
+        }
 
         return recipe.getId();
     }
@@ -157,27 +228,103 @@ public class RecipeService {
     // --- Get Recipe by ID ---
     @Transactional
     public RecipeDTO getRecipeById(Integer id) {
+        // Fetch recipe first and throw a clear ResourceNotFoundException if absent.
+        Optional<Recipe> maybeRecipe = recipeRepository.findById(id);
+        Recipe recipe = maybeRecipe.orElseThrow(() -> new ResourceNotFoundException("Recipe not found"));
 
-        // interactionService.logInteraction(
-        // userRepository.findById(id).orElseThrow(() -> new RuntimeException("User not
-        // found")),
-        // ResourceType.RECIPE,
-        // id,
-        // InteractionAction.VIEW,
-        // 1.0
-        // );
+        // Only send the interaction if we have an author available
+        Integer authorId = null;
+        if (recipe.getAuthor() != null) {
+            authorId = recipe.getAuthor().getId();
+        }
 
-        interactionProducer.sendInteraction(
-                InteractionEvent.builder()
-                        .userId(recipeRepository.findById(id).get().getAuthor().getId())
-                        .resourceType(ResourceType.RECIPE)
-                        .resourceId(id)
-                        .action(InteractionAction.VIEW)
-                        .value(2.0)
-                        .build());
-        return recipeRepository.findById(id)
-                .map(recipeMapper::toDTO)
-                .orElseThrow(() -> new ResourceNotFoundException("Recipe not found"));
+        try {
+            interactionProducer.sendInteraction(
+                    InteractionEvent.builder()
+                            .userId(authorId != null ? authorId : 0)
+                            .resourceType(ResourceType.RECIPE)
+                            .resourceId(id)
+                            .action(InteractionAction.VIEW)
+                            .value(2.0)
+                            .build());
+        } catch (Exception e) {
+            // Log and continue — interaction send failure should not block fetching the
+            // recipe
+            log.warn("Failed to send interaction event for recipe {}: {}", id, e.getMessage());
+        }
+
+        RecipeDTO dto = recipeMapper.toDTO(recipe);
+
+        // Ensure difficulty is exposed from the entity (DB column may contain it)
+        try {
+            dto.setDifficulty(recipe.getDifficulty());
+        } catch (Exception ignored) {
+        }
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        // If instructions are empty, try JSONB column first, then legacy text column
+        try {
+            if (dto.getInstructions() == null || dto.getInstructions().isEmpty()) {
+                String instrSource = null;
+                if (recipe.getInstructionsJsonb() != null && !recipe.getInstructionsJsonb().isBlank()) {
+                    instrSource = recipe.getInstructionsJsonb();
+                } else if (recipe.getInstructionsJson() != null && !recipe.getInstructionsJson().isBlank()) {
+                    instrSource = recipe.getInstructionsJson();
+                }
+                if (instrSource != null) {
+                    List<java.util.Map<String, Object>> rawInstr = mapper.readValue(instrSource,
+                            new TypeReference<List<java.util.Map<String, Object>>>() {
+                            });
+                    List<InstructionDTO> instrDtos = rawInstr.stream().map(m -> {
+                        InstructionDTO idto = new InstructionDTO();
+                        Object stepNum = m.getOrDefault("step_number", m.get("stepNumber"));
+                        if (stepNum != null)
+                            idto.setStepNumber(((Number) stepNum).intValue());
+                        idto.setStepDescription((String) (m.getOrDefault("step_description",
+                                m.getOrDefault("stepDescription", m.get("content")))));
+                        return idto;
+                    }).collect(Collectors.toList());
+                    dto.setInstructions(instrDtos);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse instructions JSON for recipe {}: {}", id, e.getMessage());
+        }
+
+        // If ingredients empty, parse JSON column
+        try {
+            if (dto.getIngredients() == null || dto.getIngredients().isEmpty()) {
+                String ingSource = null;
+                if (recipe.getIngredientsJsonb() != null && !recipe.getIngredientsJsonb().isBlank()) {
+                    ingSource = recipe.getIngredientsJsonb();
+                } else if (recipe.getIngredientsJson() != null && !recipe.getIngredientsJson().isBlank()) {
+                    ingSource = recipe.getIngredientsJson();
+                }
+                if (ingSource != null) {
+                    List<java.util.Map<String, Object>> rawIng = mapper.readValue(ingSource,
+                            new TypeReference<List<java.util.Map<String, Object>>>() {
+                            });
+                    List<IngredientDTO> ingDtos = rawIng.stream().map(m -> {
+                        IngredientDTO ing = new IngredientDTO();
+                        ing.setIngredientName((String) (m.getOrDefault("name", m.getOrDefault("ingredientName", ""))));
+                        // put quantity/unit into description if DTO doesn't have fields
+                        Object qty = m.getOrDefault("quantity", m.getOrDefault("amount", ""));
+                        Object unit = m.getOrDefault("unit", "");
+                        String desc = "";
+                        if (qty != null && !qty.toString().isBlank())
+                            desc = qty.toString() + " " + unit.toString();
+                        ing.setIngredientDescription(desc);
+                        return ing;
+                    }).collect(Collectors.toList());
+                    dto.setIngredients(ingDtos);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse ingredients JSON for recipe {}: {}", id, e.getMessage());
+        }
+
+        return dto;
     }
 
     // --- Delete Recipe ---
