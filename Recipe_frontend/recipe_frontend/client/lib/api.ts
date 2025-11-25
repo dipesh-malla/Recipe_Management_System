@@ -6,7 +6,7 @@ export const getCachedFilteredRecipes = (params: {
   searchTerm?: string;
   page?: number;
   size?: number;
-}) => {
+}, options?: RequestInit) => {
   const {
     cuisine = "all",
     difficulty = "all",
@@ -23,10 +23,19 @@ export const getCachedFilteredRecipes = (params: {
     `page=${page}`,
     `size=${size}`,
   ].filter(Boolean).join("&");
-  return javaApiFetch(`/v1/recipes/cachedFiltered?${query}`);
+  return javaApiFetch(`/v1/recipes/cachedFiltered?${query}`, options);
 };
 // Environment-based configuration
-const JAVA_BASE_URL = import.meta.env.VITE_JAVA_API_URL || "http://localhost:8090/api";
+// Try multiple local candidates so frontend can find a running Java backend
+const JAVA_BASE_URL_CANDIDATES = [
+  import.meta.env.VITE_JAVA_API_URL,
+  "http://localhost:8090/api",
+  "http://localhost:8080/api",
+].filter(Boolean);
+
+// Chosen API base (may include '/api' suffix). We also keep a separate health base (no '/api')
+let JAVA_BASE_URL = JAVA_BASE_URL_CANDIDATES[0] || "http://localhost:8090/api";
+let JAVA_BASE_HEALTH_BASE = (JAVA_BASE_URL || "http://localhost:8090/api").replace(/\/api\/?$/, "");
 const ML_BASE_URL = import.meta.env.VITE_ML_API_URL || "http://localhost:8000/api";
 
 // Log API URLs for debugging (only in development)
@@ -77,7 +86,8 @@ const scheduleJavaHealthCheck = (intervalMs = 5000) => {
   if (javaBackendHealthInterval) return;
   javaBackendHealthInterval = window.setInterval(async () => {
     try {
-      const res = await fetch(`${JAVA_BASE_URL}/health`, { method: 'GET' });
+      // Use the health base (no /api suffix) for probing the health endpoint
+      const res = await fetch(`${JAVA_BASE_HEALTH_BASE}/health`, { method: 'GET' });
       if (res.ok) {
         javaBackendAvailable = true;
         if (javaBackendHealthInterval) {
@@ -92,17 +102,28 @@ const scheduleJavaHealthCheck = (intervalMs = 5000) => {
 };
 
 // Do a one-time health probe on import to set the initial availability flag.
+// Probe candidates and pick the first healthy Java backend. Falls back to the first candidate.
 (async function initialJavaHealthProbe() {
-  try {
-    const res = await fetch(`${JAVA_BASE_URL}/health`, { method: 'GET' });
-    javaBackendAvailable = res.ok;
-    if (!res.ok) {
-      scheduleJavaHealthCheck();
+  for (const candidate of JAVA_BASE_URL_CANDIDATES) {
+    try {
+      // Probe the health endpoint on the candidate's host. If candidate includes '/api', strip it for the health probe.
+      const probeBase = String(candidate).replace(/\/api\/?$/, "");
+      const res = await fetch(`${probeBase}/health`, { method: 'GET' });
+      if (res.ok) {
+        JAVA_BASE_URL = candidate;
+        JAVA_BASE_HEALTH_BASE = probeBase;
+        javaBackendAvailable = true;
+        return;
+      }
+    } catch (e) {
+      // try next candidate
     }
-  } catch (e) {
-    javaBackendAvailable = false;
-    scheduleJavaHealthCheck();
   }
+  // If none responded, use the first candidate and start health checks
+  JAVA_BASE_URL = JAVA_BASE_URL_CANDIDATES[0] || JAVA_BASE_URL;
+  JAVA_BASE_HEALTH_BASE = String(JAVA_BASE_URL).replace(/\/api\/?$/, "");
+  javaBackendAvailable = false;
+  scheduleJavaHealthCheck();
 })();
 
 const apiFetch = async (baseUrl: string, url: string, options: RequestInit = {}) => {
@@ -123,6 +144,13 @@ const apiFetch = async (baseUrl: string, url: string, options: RequestInit = {})
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
+  }
+  // Include X-User-Id header when we have a current user stored locally (helps server-side identify user in dev setups)
+  try {
+    const cu = getCurrentUser();
+    if (cu && cu.id) headers["X-User-Id"] = String(cu.id);
+  } catch (e) {
+    // ignore if localStorage inaccessible
   }
 
   // Short-circuit calls to Java backend while it's known to be down
@@ -254,6 +282,20 @@ export const login = (data: any) => {
 
 export const getAllUsers = (page = 0, size = 10) => javaApiFetch(`/v1/users?page=${page}&size=${size}`);
 
+// Get only chefs (users with recipes) sorted by recipe count desc (server-side)
+export const getChefs = (page = 0, size = 10, search?: string, sortBy = "recipes", sortOrder = "DESC", options?: RequestInit) => {
+  const qs = [
+    `page=${page}`,
+    `size=${size}`,
+    search ? `search=${encodeURIComponent(search)}` : null,
+    sortBy ? `sortBy=${encodeURIComponent(sortBy)}` : null,
+    sortOrder ? `sortOrder=${encodeURIComponent(sortOrder)}` : null,
+  ].filter(Boolean).join("&");
+  return javaApiFetch(`/v1/users/chefs?${qs}`, options);
+};
+
+export const getTrendingChefs = (size = 6) => javaApiFetch(`/v1/users/chefs/trending?size=${size}`);
+
 export const getUserById = (id: number) => javaApiFetch(`/v1/users/${id}`);
 
 export const getUserRecipes = (userId: number, page = 0, size = 20) => javaApiFetch(`/v1/recipes/user/${userId}?page=${page}&size=${size}`);
@@ -280,16 +322,31 @@ export const getAllRecipes = (page = 0, size = 50, sortBy = "createdDate", sortO
   javaApiFetch(`/v1/recipes/allRecipe?page=${page}&size=${size}&sortBy=${sortBy}&sortOrder=${sortOrder}`);
 
 export const createRecipe = (recipeData: any, files: File[]) => {
-    const formData = new FormData();
-    formData.append('recipe', new Blob([JSON.stringify(recipeData)], { type: 'application/json' }));
+  const formData = new FormData();
+  formData.append('recipe', new Blob([JSON.stringify(recipeData)], { type: 'application/json' }));
+  // Attach files if provided (optional)
+  if (files && files.length) {
     files.forEach(file => formData.append('files', file));
-    return javaApiFetchMultipart("/v1/recipes", formData, 'POST');
+  }
+
+  // Include current user's id as authorId when available so backend can
+  // associate the recipe with the logged-in user without requiring headers.
+  try {
+    const currentUser = getCurrentUser();
+    if (currentUser && currentUser.id) {
+      formData.append('authorId', String(currentUser.id));
+    }
+  } catch (e) {
+    // ignore if localStorage isn't accessible
+  }
+
+  return javaApiFetchMultipart("/v1/recipes", formData, 'POST');
 };
 
 export const getRecipeById = (id: number | string) => {
   // Short-circuit if we already know the Java backend is down
   if (!javaBackendAvailable) {
-    return Promise.resolve({ data: { id, title: `Recipe ${id}`, image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Recipe+Image', cuisine: null, difficulty: null, cookTime: 0, authorName: 'Unknown Chef', reactionsCount: 0, commentsCount: 0 } });
+    return Promise.resolve({ data: { id, title: `Recipe ${id}`, image: `https://placehold.co/400x300/e2e8f0/64748b?text=${encodeURIComponent(`Recipe ${id}`)}`, cuisine: null, difficulty: null, cookTime: 0, authorName: 'Unknown Chef', reactionsCount: 0, commentsCount: 0 } });
   }
 
   return (async () => {
@@ -305,9 +362,108 @@ export const getRecipeById = (id: number | string) => {
         // ignore
       }
       // Return a minimal fallback DTO so callers can continue without errors.
-      return { data: { id, title: `Recipe ${id}`, image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Recipe+Image', cuisine: null, difficulty: null, cookTime: 0, authorName: 'Unknown Chef', reactionsCount: 0, commentsCount: 0 } };
+      return { data: { id, title: `Recipe ${id}`, image: `https://placehold.co/400x300/e2e8f0/64748b?text=${encodeURIComponent(`Recipe ${id}`)}`, cuisine: null, difficulty: null, cookTime: 0, authorName: 'Unknown Chef', reactionsCount: 0, commentsCount: 0 } };
     }
   })();
+};
+
+// Homepage cached endpoints served by the frontend server (proxies Java backend and uses Redis)
+const FRONTEND_SERVER_BASE = import.meta.env.VITE_FRONTEND_SERVER_URL || "";
+
+// Robust helpers: try frontend server cached endpoints first, fall back to Java backend directly
+export const getHomeFeatured = async () => {
+  const prefix = FRONTEND_SERVER_BASE || "";
+  try {
+    const res = await fetch(`${prefix}/api/home/featured`);
+    if (res.ok) return res.json();
+  } catch (e) {
+    // ignore and try Java backend
+  }
+  // Fallback: call Java backend directly; prefer recipes sorted by likeCount (most liked)
+  try {
+    return await javaApiFetch(`/v1/recipes/allRecipe?page=0&size=6&sortBy=likeCount&sortOrder=DESC`);
+  } catch (e) {
+    // last-resort: return empty
+    return { data: [] };
+  }
+};
+
+export const getHomeChefs = async () => {
+  const prefix = FRONTEND_SERVER_BASE || "";
+  const normalize = (json: any) => {
+    const arr = json?.data?.content ?? json?.content ?? json?.data ?? json ?? [];
+    if (Array.isArray(arr)) return arr;
+    // try nested content
+    return Array.isArray(arr?.content) ? arr.content : [];
+  };
+
+  try {
+    const res = await fetch(`${prefix}/api/home/chefs`);
+    if (res.ok) {
+      const json = await res.json();
+      const raw = normalize(json);
+      return raw.map((u: any) => ({
+        id: u.id,
+        name: u.displayName || u.name || u.username || `User ${u.id}`,
+        specialty: u.profile?.specialty || u.specialty || (u.expertise && u.expertise[0]) || 'General Cuisine',
+        followers: u.followersCount ?? u.followers ?? u.stats?.followersCount ?? u.stats?.followers ?? u.followers_count ?? 0,
+        recipes: u.recipeCount ?? u.recipes ?? u.stats?.recipeCount ?? u.stats?.recipes ?? u.recipe_count ?? 0,
+        image: u.profile?.url || u.profileUrl || u.avatar || `https://i.pravatar.cc/150?u=${u.id}`,
+      }));
+    }
+  } catch (e) {
+    // ignore and fallback
+  }
+
+  // Fallback: call the Java chefs endpoint directly (ensures we get users with recipes)
+  try {
+    const json = await javaApiFetch(`/v1/users/chefs?page=0&size=4&sortBy=followers&sortOrder=DESC`);
+    const raw = normalize(json);
+    return raw.map((u: any) => ({
+      id: u.id,
+      name: u.displayName || u.name || u.username || `User ${u.id}`,
+      specialty: u.profile?.specialty || u.specialty || (u.expertise && u.expertise[0]) || 'General Cuisine',
+      followers: u.followersCount ?? u.followers ?? u.stats?.followersCount ?? u.stats?.followers ?? u.followers_count ?? 0,
+      recipes: u.recipeCount ?? u.recipes ?? u.stats?.recipeCount ?? u.stats?.recipes ?? u.recipe_count ?? 0,
+      image: u.profile?.url || u.profileUrl || u.avatar || `https://i.pravatar.cc/150?u=${u.id}`,
+    }));
+  } catch (e) {
+    return [];
+  }
+};
+
+// Invalidate cached home chefs on the proxy server (used after follow/unfollow)
+export const invalidateHomeChefsCache = async () => {
+  const prefix = FRONTEND_SERVER_BASE || "";
+  try {
+    const res = await fetch(`${prefix}/api/home/invalidate/chefs`, { method: 'POST' });
+    if (res.ok) return true;
+  } catch (e) {
+    // ignore
+  }
+  return false;
+};
+
+export const getHomeStats = async () => {
+  const prefix = FRONTEND_SERVER_BASE || "";
+  try {
+    const res = await fetch(`${prefix}/api/home/stats`);
+    if (res.ok) return res.json();
+  } catch (e) {
+    // ignore
+  }
+  // Fallback: call Java endpoints to derive stats
+  try {
+    const recipes = await javaApiFetch(`/v1/recipes/allRecipe?page=0&size=1`);
+    const users = await javaApiFetch(`/v1/users?page=0&size=1`);
+    const community = await javaApiFetch(`/v1/user-stats/allUserStats`);
+    const totalRecipes = recipes?.data?.totalElements ?? recipes?.totalElements ?? 0;
+    const totalUsers = users?.data?.totalElements ?? users?.totalElements ?? 0;
+    const totalCommunity = community?.data?.totalElements ?? (Array.isArray(community?.data) ? community.data.length : 0);
+    return { totalRecipes, totalUsers, totalCommunity };
+  } catch (e) {
+    return { totalRecipes: 0, totalUsers: 0, totalCommunity: 0 };
+  }
 };
 
 // Lightweight health check helper for UI code to probe Java backend once before bulk requests
@@ -352,7 +508,7 @@ export const filterRecipes = (filterData: any) => javaApiFetch("/v1/recipes/filt
 // POST API
 // =================================================================
 
-export const getAllPosts = () => javaApiFetch("/posts");
+export const getAllPosts = (page = 0, size = 30) => javaApiFetch(`/posts?page=${page}&size=${size}`);
 
 export const createOrUpdatePost = (postData: any, files?: File[]) => {
     const formData = new FormData();
@@ -375,12 +531,57 @@ export const filterPosts = (filterData: any) => javaApiFetch("/posts/filter", { 
 
 export const deletePost = (id: number) => javaApiFetch(`/posts/delete?id=${id}`, { method: 'DELETE' });
 
+// Fetch latest posts via the server-side paginated filter endpoint.
+export const getLatestPosts = (size = 10) => {
+  const body = {
+    data: {
+      pagination: { page: 0, size },
+      sortBy: 'createdDate',
+      sortOrder: 'DESC'
+    }
+  };
+  return javaApiFetch("/posts/filter", { method: 'POST', body: JSON.stringify(body) });
+}
+
+// Fetch a specific page of posts using the server-side filter endpoint
+export const getPostsPage = (page = 0, size = 30, sortBy = 'createdDate', sortOrder = 'DESC') => {
+  const body = {
+    data: {
+      pagination: { page, size },
+      sortBy,
+      sortOrder
+    }
+  };
+  return javaApiFetch("/posts/filter", { method: 'POST', body: JSON.stringify(body) });
+}
+
 
 // =================================================================
 // FOLLOW API
 // =================================================================
 
-export const followUser = (followerId: number, followeeId: number) => javaApiFetch("/v1/follow/follow", { method: 'POST', body: JSON.stringify({ follower: followerId, followee: followeeId }) });
+export const followUser = (
+  followerIdOrPayload: number | { followerId: number; followeeId: number },
+  followeeIdOptional?: number
+) => {
+  // Accept either signature:
+  //  - followUser(followerId, followeeId)
+  //  - followUser({ followerId, followeeId })
+  let body: { followerId: number; followeeId: number };
+  if (typeof followerIdOrPayload === "object") {
+    body = {
+      followerId: followerIdOrPayload.followerId,
+      followeeId: followerIdOrPayload.followeeId,
+    };
+  } else {
+    body = {
+      followerId: followerIdOrPayload,
+      followeeId: followeeIdOptional as number,
+    };
+  }
+
+  return javaApiFetch("/v1/follow/follow", { method: 'POST', body: JSON.stringify(body) });
+};
 
 export const unfollowUser = (followerId: number, followeeId: number) => javaApiFetch(`/v1/follow/unfollow?followerId=${followerId}&followeeId=${followeeId}`, { method: 'DELETE' });
 
