@@ -53,16 +53,44 @@ public class RecipeController extends BaseController {
         @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
         public ResponseEntity<GlobalApiResponse<Integer>> saveRecipe(
                         @RequestPart("recipe") String recipeJson,
-                        @RequestPart(value = "files", required = false) List<MultipartFile> files)
-                        throws JsonProcessingException {
+                        @RequestPart(value = "files", required = false) List<MultipartFile> files,
+                        @RequestHeader(value = "X-User-Id", required = false) String xUserId,
+                        @RequestParam(value = "authorId", required = false) Integer authorId) {
+                try {
+                        // Remove BOM if present (PowerShell/Windows may add a UTF-8 BOM)
+                        if (recipeJson != null && recipeJson.length() > 0 && recipeJson.charAt(0) == '\uFEFF') {
+                                recipeJson = recipeJson.substring(1);
+                        }
 
-                RecipeDTO recipeDTO = new ObjectMapper().readValue(recipeJson, RecipeDTO.class);
+                        ObjectMapper mapper = new ObjectMapper();
+                        RecipeDTO recipeDTO = mapper.readValue(recipeJson, RecipeDTO.class);
 
-                return ResponseEntity.ok(
-                                successResponse(
-                                                recipeService.saveRecipeWithMedia(recipeDTO, files),
-                                                Messages.SUCCESS,
-                                                "Recipe saved successfully"));
+                        // Resolve authorId from multiple sources if not present in JSON
+                        if (recipeDTO.getAuthorId() == null || recipeDTO.getAuthorId() == 0) {
+                                if (authorId != null) {
+                                        recipeDTO.setAuthorId(authorId);
+                                } else if (xUserId != null && !xUserId.isBlank()) {
+                                        try {
+                                                Integer parsed = Integer.valueOf(xUserId.trim());
+                                                recipeDTO.setAuthorId(parsed);
+                                        } catch (NumberFormatException ignored) {
+                                        }
+                                }
+                        }
+
+                        Integer createdId = recipeService.saveRecipeWithMedia(recipeDTO, files);
+                        return ResponseEntity
+                                        .ok(successResponse(createdId, Messages.SUCCESS, "Recipe saved successfully"));
+
+                } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                        return ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST)
+                                        .body(errorResponse("Invalid recipe JSON: " + e.getOriginalMessage(),
+                                                        org.springframework.http.HttpStatus.BAD_REQUEST));
+                } catch (Exception e) {
+                        return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                                        .body(errorResponse("Failed to save recipe: " + e.getMessage(),
+                                                        org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR));
+                }
         }
 
         @GetMapping("find/{id}")

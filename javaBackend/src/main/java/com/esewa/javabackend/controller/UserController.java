@@ -84,10 +84,22 @@ public class UserController extends BaseController {
     @GetMapping(path = "/chefs")
     public ResponseEntity<GlobalApiResponse<?>> getChefs(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        // Return only chefs with recipes, sorted by recipe count descending
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "recipes") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortOrder) {
+        // Return only chefs with recipes; support server-side search and sorting
         return ResponseEntity.ok(successResponse(
-                userService.getChefsWithRecipes(page, size),
+                userService.getChefsWithRecipes(page, size, search, sortBy, sortOrder),
+                Messages.SAVED_SUCCESS));
+    }
+
+    // Trending chefs (top N by combined followers + recipes)
+    @GetMapping(path = "/chefs/trending")
+    public ResponseEntity<GlobalApiResponse<?>> getTrendingChefs(
+            @RequestParam(defaultValue = "6") int size) {
+        return ResponseEntity.ok(successResponse(
+                userService.getTrendingChefs(size),
                 Messages.SAVED_SUCCESS));
     }
 
