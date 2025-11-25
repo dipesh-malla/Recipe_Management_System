@@ -46,7 +46,7 @@ export default function SavedRecipes() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {savedRecipes.map(item => (
                     <Card key={item.id} className="overflow-hidden">
-                         <Link to={`/recipe/${item.resourceId}`}>
+                         <Link to={`/recipes/${item.resourceId}`}>
                             <img 
                                 src={item.resource?.media?.[0]?.url || 'https://via.placeholder.com/300'} 
                                 alt={item.resource?.title || "Saved recipe"} 
@@ -55,7 +55,7 @@ export default function SavedRecipes() {
                         </Link>
                         <div className="p-4">
                             <h3 className="font-bold text-lg hover:underline">
-                                 <Link to={`/recipe/${item.resourceId}`}>{item.resource?.title || "Untitled Recipe"}</Link>
+                                 <Link to={`/recipes/${item.resourceId}`}>{item.resource?.title || "Untitled Recipe"}</Link>
                             </h3>
                              <p className="text-sm text-gray-500">Saved on {new Date(item.createdDate).toLocaleDateString()}</p>
                             <div className="flex justify-end mt-4">
