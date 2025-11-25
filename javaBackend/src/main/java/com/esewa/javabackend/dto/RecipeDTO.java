@@ -24,11 +24,13 @@ public class RecipeDTO {
     private String cuisine;
     private Integer servings;
     private Integer cookTime;
+    private Integer prepTime;
     @JsonProperty("isPublic")
     private boolean isPublic;
     private LocalDateTime createdDate;
     private LocalDateTime modifiedDate;
     private List<MediaDTO> media;
+    private String difficulty;
     // Dynamic fields for frontend
     private String authorName;
     private int reactionsCount;

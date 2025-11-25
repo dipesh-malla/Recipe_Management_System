@@ -15,4 +15,9 @@ public interface UserStatsRepository extends JpaRepository<UserStats, Integer>, 
     Optional<UserStats> findByUser(User follower);
 
     Optional<UserStats> findByUserId(Integer userId);
+
+    // Return UserStats ordered by combined score (followers + recipes) desc
+    @org.springframework.data.jpa.repository.Query("SELECT us FROM UserStats us ORDER BY (us.followersCount + us.recipeCount) DESC")
+    org.springframework.data.domain.Page<UserStats> findTopByCombined(
+            org.springframework.data.domain.Pageable pageable);
 }

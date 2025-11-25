@@ -9,6 +9,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
 import java.util.UUID;
+import jakarta.persistence.PrePersist;
 
 @Getter
 @Setter
@@ -16,8 +17,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @SuperBuilder
 @Entity
-@Table(name = "follows",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"follower_id", "followee_id"}))
+@Table(name = "follows", uniqueConstraints = @UniqueConstraint(columnNames = { "follower_id", "followee_id" }))
 public class Follow extends AuditingEntity {
 
     @Id
@@ -32,10 +32,17 @@ public class Follow extends AuditingEntity {
     @JoinColumn(name = "followee_id")
     private User followee;
 
-
     @Enumerated(EnumType.STRING)
     private FollowStatus status;
+
+    @Column(name = "is_new", nullable = false)
+    private Boolean isNew;
+
+    @PrePersist
+    public void prePersist() {
+        if (this.isNew == null)
+            this.isNew = Boolean.TRUE;
+        if (this.status == null)
+            this.status = FollowStatus.ACTIVE;
+    }
 }
-
-
-
