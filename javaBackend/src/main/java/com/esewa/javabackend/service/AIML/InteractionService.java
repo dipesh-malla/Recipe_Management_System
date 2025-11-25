@@ -1,6 +1,5 @@
 package com.esewa.javabackend.service.AIML;
 
-
 import com.esewa.javabackend.dto.InteractionDTO;
 import com.esewa.javabackend.enums.InteractionAction;
 import com.esewa.javabackend.enums.ResourceType;
@@ -19,43 +18,70 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class InteractionService {
 
-    private final InteractionRepository repository;
-    private final UserRepository userRepository;
+        private final InteractionRepository repository;
+        private final UserRepository userRepository;
 
-    public InteractionDTO logInteraction(Integer id, ResourceType type, Integer resourceId, InteractionAction action, Double value) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        // --- Added helpers for saves ---
 
-        Interaction interaction = Interaction.builder()
-                .user(user)
-                .resourceType(type)
-                .resourceId(resourceId)
-                .action(action)
-                .value(value)
-                .createdAt(Instant.now())
-                .build();
-         repository.save(interaction);
-         return InteractionDTO.builder()
-                 .userId(id)
-                 .resourceType(type)
-                 .resourceId(resourceId)
-                 .action(action)
-                 .value(value)
-                 .build();
-    }
+        public InteractionDTO logInteraction(Integer id, ResourceType type, Integer resourceId,
+                        InteractionAction action, Double value) {
+                User user = userRepository.findById(id)
+                                .orElseThrow(() -> new RuntimeException("User not found"));
 
-    public List<InteractionDTO> allInteraction() {
+                Interaction interaction = Interaction.builder()
+                                .user(user)
+                                .resourceType(type)
+                                .resourceId(resourceId)
+                                .action(action)
+                                .value(value)
+                                .createdAt(Instant.now())
+                                .build();
+                repository.save(interaction);
+                return InteractionDTO.builder()
+                                .userId(id)
+                                .resourceType(type)
+                                .resourceId(resourceId)
+                                .action(action)
+                                .value(value)
+                                .build();
+        }
 
-        return repository.findAll().stream()
-                .map(interaction -> InteractionDTO.builder()
-                        .id(interaction.getId())
-                        .userId(interaction.getUser().getId())
-                        .resourceType(interaction.getResourceType())
-                        .resourceId(interaction.getResourceId())
-                        .action(interaction.getAction())
-                        .value(interaction.getValue())
-                        .createdAT(interaction.getCreatedAt())
-                        .build())
-                .collect(Collectors.toList());
-    }
+        public InteractionDTO logSave(Integer userId, ResourceType type, Integer resourceId) {
+                return logInteraction(userId, type, resourceId, InteractionAction.SAVE, 1.0);
+        }
+
+        public void deleteInteraction(Integer id) {
+                repository.deleteById(id);
+        }
+
+        public java.util.List<InteractionDTO> getInteractionsByUserAndAction(Integer userId) {
+                User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+                return repository.findByUser(user).stream()
+                                .filter(i -> i.getAction() == InteractionAction.SAVE)
+                                .map(interaction -> InteractionDTO.builder()
+                                                .id(interaction.getId())
+                                                .userId(interaction.getUser().getId())
+                                                .resourceType(interaction.getResourceType())
+                                                .resourceId(interaction.getResourceId())
+                                                .action(interaction.getAction())
+                                                .value(interaction.getValue())
+                                                .createdAT(interaction.getCreatedAt())
+                                                .build())
+                                .collect(java.util.stream.Collectors.toList());
+        }
+
+        public List<InteractionDTO> allInteraction() {
+
+                return repository.findAll().stream()
+                                .map(interaction -> InteractionDTO.builder()
+                                                .id(interaction.getId())
+                                                .userId(interaction.getUser().getId())
+                                                .resourceType(interaction.getResourceType())
+                                                .resourceId(interaction.getResourceId())
+                                                .action(interaction.getAction())
+                                                .value(interaction.getValue())
+                                                .createdAT(interaction.getCreatedAt())
+                                                .build())
+                                .collect(Collectors.toList());
+        }
 }
