@@ -18,4 +18,5 @@ public class PostDTO {
     private List<MediaDTO> mediaIds;
     private String privacy;
     private boolean pinned;
+    private boolean isNew;
 }
