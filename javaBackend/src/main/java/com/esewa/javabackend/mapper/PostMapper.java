@@ -12,7 +12,8 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.factory.Mappers;
 
-@Mapper(componentModel = "spring", uses = {CommentMapper.class, ReactionMapper.class, MediaMapper.class, UserMapper.class})
+@Mapper(componentModel = "spring", uses = { CommentMapper.class, ReactionMapper.class, MediaMapper.class,
+        UserMapper.class })
 public interface PostMapper {
 
     @Mapping(source = "author.id", target = "author.id")
@@ -25,9 +26,8 @@ public interface PostMapper {
     Post toEntity(PostDTO postDTO);
 
     @Mapping(source = "authorId", target = "author.id")
+    @Mapping(target = "id", ignore = true)
     void updatePostFromDTO(PostDTO postDTO, @MappingTarget Post post);
 
     PostDTO toDTO(Post post);
 }
-
-
