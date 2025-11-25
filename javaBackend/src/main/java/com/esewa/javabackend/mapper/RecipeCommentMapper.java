@@ -29,16 +29,4 @@ public interface RecipeCommentMapper {
         return comments.stream().map(this::toDTO).collect(Collectors.toSet());
     }
 
-    default Set<RecipeComment> toEntitySet(List<RecipeCommentDTO> dtos) {
-        if (dtos == null) return Collections.emptySet();
-        return dtos.stream().map(this::toEntity).collect(Collectors.toSet());
-    }
-    // --- Recursive mapping for nested replies ---
-    default RecipeCommentDTO toDTOWithReplies(RecipeComment comment) {
-        RecipeCommentDTO dto = toDTO(comment);
-        if (comment.getReplies() != null && !comment.getReplies().isEmpty()) {
-            dto.setReplies(toDTOList(comment.getReplies()));
-        }
-        return dto;
-    }
 }

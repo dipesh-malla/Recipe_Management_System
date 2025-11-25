@@ -12,6 +12,7 @@ public interface FollowMapper {
 
     @Mapping(source = "follower", target = "follower")
     @Mapping(source = "followee", target = "followee")
+    @Mapping(source = "new", target = "isNew")
     FollowDTO toDTO(Follow follow);
 
     @Mapping(source = "follower", target = "follower")

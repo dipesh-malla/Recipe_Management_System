@@ -84,4 +84,6 @@ public class User extends AuditingEntity {
     @Builder.Default
     private List<Post> posts = new ArrayList<>();
 
+    private boolean isNew = true;
+
 }
