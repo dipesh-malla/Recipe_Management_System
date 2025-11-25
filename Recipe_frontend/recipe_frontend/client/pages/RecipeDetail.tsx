@@ -10,18 +10,24 @@ import {
   Share2,
   Bookmark,
   Send,
-  ChefHat
+  ChefHat,
+  Volume2
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
     getCurrentUser,
     getRecipeById, 
     likeRecipe, 
     addCommentToRecipe, 
-    saveResource, 
+    saveResource,
+    getAllSavedItems,
+    unsaveResource,
     followUser, 
+    getCachedFilteredRecipes,
     getSimilarRecipes,
-    getUserStatByUserId
+    getRecipeRecommendationsPost,
+    getUserStatByUserId,
+    getUserById
 } from "@/lib/api";
 import { RecipeRecommendationResponse } from "@shared/api";
 
@@ -65,8 +71,14 @@ export default function RecipeDetail() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveRecordId, setSaveRecordId] = useState<number | null>(null);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const synthRef = (typeof window !== 'undefined' && (window as any).speechSynthesis) ? (window as any).speechSynthesis : null;
+  const utterancesRef = useRef<SpeechSynthesisUtterance[] | null>(null);
   const currentUser = getCurrentUser();
 
  const staticRecipeDetails = [
@@ -188,94 +200,203 @@ const staticRecommendations = staticRecipeDetails.slice(1, 4).map(r => ({ ...r, 
         setError(null);
 
         getRecipeById(id)
-            .then(async data => {
-                const d = data.data;
+          .then(async data => {
+            const d = data.data;
+            console.debug("[RecipeDetail] fetched DTO:", d);
                 
                 // Check if recipe data is valid
                 if (!d) {
                     throw new Error("Recipe data is empty");
                 }
                 
-                // Fetch author stats if author exists
+                // Backend DTO exposes authorId and authorName; try to enrich with user/profile info
                 let authorFollowers = 0;
-                if (d.author?.id) {
-                    try {
-                        const authorStats = await getUserStatByUserId(d.author.id);
-                        if (authorStats?.success && authorStats.data) {
-                            authorFollowers = authorStats.data.followersCount || 0;
-                        }
-                    } catch (err) {
-                        console.warn("Failed to fetch author stats:", err);
+                let authorAvatar = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop";
+                const authorId = d.authorId || d.author?.id || 0;
+                if (authorId) {
+                  try {
+                    const [authorStatsResp, userResp] = await Promise.allSettled([
+                      getUserStatByUserId(authorId),
+                      getUserById(authorId),
+                    ]);
+
+                    if (authorStatsResp.status === 'fulfilled' && authorStatsResp.value?.success && authorStatsResp.value.data) {
+                      authorFollowers = authorStatsResp.value.data.followersCount || 0;
                     }
+
+                    if (userResp.status === 'fulfilled' && userResp.value?.data) {
+                      const u = userResp.value.data;
+                      authorAvatar = u.profile?.url || u.profileUrl || u.avatar || authorAvatar;
+                    }
+                  } catch (err) {
+                    console.warn("Failed to fetch author enrichment:", err);
+                  }
                 }
-                
+
+                // Normalize instructions, ingredients and comments into the shape expected by the UI
+                const normalizeInstructions = (raw: any) => {
+                  let arr = raw;
+                  if (!arr) return [];
+                  if (typeof arr === 'string') {
+                    try { arr = JSON.parse(arr); } catch (e) { arr = []; }
+                  }
+                  return (Array.isArray(arr) ? arr : []).map((it: any, i: number) => ({
+                    stepNumber: it.stepNumber ?? it.step_number ?? it.step ?? (i + 1),
+                    content: it.stepDescription ?? it.step_description ?? it.step_description_text ?? it.content ?? "",
+                  }));
+                };
+
+                const normalizeIngredients = (raw: any) => {
+                  let arr = raw;
+                  if (!arr) return [];
+                  if (typeof arr === 'string') {
+                    try { arr = JSON.parse(arr); } catch (e) { arr = []; }
+                  }
+                  return (Array.isArray(arr) ? arr : []).map((ing: any, i: number) => ({
+                    name: ing.ingredientName ?? ing.ingredient_name ?? ing.name ?? ing.ingredient ?? "",
+                    amount: ing.quantity ?? ing.amount ?? ing.qty ?? ing.quantity ?? "",
+                    unit: ing.unit ?? ing.uom ?? ing.unit ?? "",
+                    description: ing.ingredientDescription ?? ing.ingredient_description ?? ing.description ?? "",
+                  }));
+                };
+
+                const normalizeComments = (raw: any) => {
+                  let arr = raw;
+                  if (!arr) return [];
+                  if (typeof arr === 'string') {
+                    try { arr = JSON.parse(arr); } catch (e) { arr = []; }
+                  }
+                  return (Array.isArray(arr) ? arr : []).map((c: any, i: number) => ({
+                    id: c.id ?? `c-${i}`,
+                    author: c.author ?? c.user ?? { displayName: c.authorName ?? c.username ?? 'Anonymous', profile: { url: c.authorProfileUrl ?? null }, username: c.username ?? null },
+                    content: c.content ?? c.text ?? c.body ?? "",
+                  }));
+                };
+
+                const normalizedInstructions = normalizeInstructions(d.instructions ?? d.steps ?? []);
+                const normalizedIngredients = normalizeIngredients(d.ingredients ?? d.ingredientsList ?? []);
+                const normalizedComments = normalizeComments(d.comments ?? d.commentsList ?? []);
+
+                console.debug("[RecipeDetail] normalizedInstructions:", normalizedInstructions);
+                console.debug("[RecipeDetail] normalizedIngredients:", normalizedIngredients);
+                console.debug("[RecipeDetail] normalizedComments:", normalizedComments);
+
                 setRecipe({
-                    id: d.id,
-                    title: d.title,
-                    description: d.description,
-                    image: d.media?.[0]?.url || "https://images.unsplash.com/photo-1612874742237-6526221fcfbb?w=800&h=600&fit=crop",
-                    cuisine: d.cuisine,
-                    difficulty: d.difficulty,
-                    cookTime: d.cookTime,
-                    prepTime: d.prepTime,
-                    servings: d.servings,
-                    author: {
-                        id: d.author?.id || 0,
-                        name: d.author?.displayName || "Unknown Chef",
-                        avatar: d.author?.profile?.url || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
-                        followers: authorFollowers,
-                    },
-                    reactions: d.reactionsCount || 0,
-                    comments: d.comments || [],
-                    ingredients: d.ingredients || [],
-                    instructions: d.instructions || [],
+                  id: d.id,
+                  title: d.title,
+                  description: d.description,
+                  image: d.media?.[0]?.url || d.image || "https://images.unsplash.com/photo-1612874742237-6526221fcfbb?w=800&h=600&fit=crop",
+                  cuisine: d.cuisine,
+                  difficulty: d.difficulty || d.difficultyLevel || "",
+                  cookTime: d.cookTime ?? d.cook_time ?? 0,
+                  prepTime: d.prepTime ?? d.prep_time ?? 0,
+                  servings: d.servings ?? 0,
+                  author: {
+                    id: authorId || 0,
+                    name: d.authorName || d.author?.displayName || "Unknown Chef",
+                    avatar: authorAvatar,
+                    followers: authorFollowers,
+                  },
+                  reactions: d.reactionsCount ?? d.likeCount ?? d.reactions ?? 0,
+                  comments: normalizedComments,
+                  ingredients: normalizedIngredients,
+                  instructions: normalizedInstructions,
                 });
 
-                getRecipeRecommendationsPost({ user_id: d.author?.id || 1, top_k: 3 })
-                  .then(async (rec_data: RecipeRecommendationResponse) => {
-                    // Fetch author stats for all recommended recipes in parallel
-                    const recsWithStats = await Promise.all(
-                      rec_data.recommendations.map(async (r: any) => {
+                // Fetch similar recipes (ML-backed) for the current recipe id, then resolve full recipe details from Java backend
+                (async () => {
+                  try {
+                    const simResp = await getSimilarRecipes({ recipe_id: parseInt(d.id), top_k: 6 });
+                    const recs = simResp?.recommendations ?? simResp?.data ?? simResp ?? [];
+
+                    // Normalize recommendations array to extract recipe IDs.
+                    // ML may return numbers or objects with `id`, `recipe_id` or `recipeId`.
+                    const recIds: number[] = (Array.isArray(recs) ? recs : []).map((r: any) => {
+                      if (typeof r === 'number') return r;
+                      return r?.id ?? r?.recipe_id ?? r?.recipeId ?? null;
+                    }).filter((x: any) => x != null).map((x: any) => parseInt(x, 10)).filter(Boolean).slice(0, 6);
+
+                    // Fetch full recipe details for each recommended id in parallel (skip failures)
+                    const recDetails = await Promise.all(recIds.map(async (rid) => {
+                      try {
+                        const rr = await getRecipeById(rid);
+                        const rd = rr?.data;
+                        if (!rd) return null;
                         let authorFollowers = 0;
-                        if (r.author?.id) {
-                          try {
-                            const authorStats = await getUserStatByUserId(r.author.id);
-                            if (authorStats?.success && authorStats.data) {
-                              authorFollowers = authorStats.data.followersCount || 0;
-                            }
-                          } catch (err) {
-                            console.warn(`Failed to fetch stats for author ${r.author.id}:`, err);
-                          }
+                        try {
+                          const as = await getUserStatByUserId(rd.authorId || rd.author?.id || 0);
+                          if (as?.success && as.data) authorFollowers = as.data.followersCount || 0;
+                        } catch (e) {
+                          // ignore author stat failures
                         }
                         return {
-                          id: r.id,
-                          title: r.title,
-                          description: r.description,
-                          image: r.media?.[0]?.url || "https://images.unsplash.com/photo-1612874742237-6526221fcfbb?w=800&h=600&fit=crop",
-                          cuisine: r.cuisine,
-                          difficulty: r.difficulty,
-                          cookTime: r.cookTime,
-                          prepTime: r.prepTime,
-                          servings: r.servings,
+                          id: rd.id,
+                          title: rd.title,
+                          description: rd.description,
+                          image: rd.media?.[0]?.url || rd.image || "https://images.unsplash.com/photo-1612874742237-6526221fcfbb?w=800&h=600&fit=crop",
+                          cuisine: rd.cuisine,
+                          difficulty: rd.difficulty,
+                          cookTime: rd.cookTime,
+                          prepTime: rd.prepTime,
+                          servings: rd.servings,
                           author: {
-                            id: r.author?.id || 0,
-                            name: r.author?.displayName || "Unknown Chef",
-                            avatar: r.author?.profile?.url || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
+                            id: rd.authorId || rd.author?.id || 0,
+                            name: rd.authorName || rd.author?.displayName || "Unknown Chef",
+                            avatar: rd.author?.profile?.url || rd.author?.avatar || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
                             followers: authorFollowers,
                           },
-                          reactions: r.reactionsCount || 0,
-                          comments: r.comments || [],
-                          ingredients: r.ingredients || [],
-                          instructions: r.instructions || [],
+                          reactions: rd.reactionsCount ?? rd.likeCount ?? 0,
+                          comments: rd.comments ?? [],
+                          ingredients: rd.ingredients ?? [],
+                          instructions: rd.instructions ?? [],
                         };
-                      })
-                    );
-                    setRecommendations(recsWithStats);
-                  })
-                  .catch(rec_err => {
-                    console.error("Failed to fetch recommendations:", rec_err);
-                    setRecommendations(staticRecommendations);
-                  });
+                      } catch (e) {
+                        return null;
+                      }
+                    }));
+
+                    const finalRecs = recDetails.filter(Boolean) as Recommendation[];
+                    if (finalRecs.length > 0) {
+                      setRecommendations(finalRecs.slice(0, 6));
+                    } else {
+                      setRecommendations(staticRecommendations);
+                    }
+                  } catch (rec_err) {
+                    console.error("Failed to fetch similar recipes:", rec_err);
+                    try {
+                      // Fallback to Java backend: fetch recipes with same cuisine (or any useful filter)
+                      const resp = await getCachedFilteredRecipes({ cuisine: d.cuisine || 'all', page: 0, size: 6 });
+                      const raw = resp?.data?.content ?? resp?.content ?? resp?.data ?? resp ?? [];
+                      const arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.content) ? raw.content : []);
+                      const mapped = arr.map((rd: any) => ({
+                        id: rd.id,
+                        title: rd.title,
+                        description: rd.description,
+                        image: rd.media?.[0]?.url || rd.image || "https://images.unsplash.com/photo-1612874742237-6526221fcfbb?w=800&h=600&fit=crop",
+                        cuisine: rd.cuisine,
+                        difficulty: rd.difficulty,
+                        cookTime: rd.cookTime ?? rd.cook_time,
+                        prepTime: rd.prepTime ?? rd.prep_time,
+                        servings: rd.servings,
+                        author: {
+                          id: rd.authorId || rd.author?.id || 0,
+                          name: rd.authorName || rd.author?.displayName || "Unknown Chef",
+                          avatar: rd.author?.profile?.url || rd.author?.avatar || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
+                          followers: rd.authorFollowers || 0,
+                        },
+                        reactions: rd.reactionsCount ?? rd.likeCount ?? rd.reactions ?? 0,
+                        comments: rd.comments ?? rd.commentsCount ?? [],
+                        ingredients: rd.ingredients ?? [],
+                        instructions: rd.instructions ?? [],
+                      }));
+                      if (mapped.length > 0) setRecommendations(mapped.slice(0,6));
+                      else setRecommendations(staticRecommendations);
+                    } catch (fallbackErr) {
+                      console.error("Fallback fetch for similar recipes failed:", fallbackErr);
+                      setRecommendations(staticRecommendations);
+                    }
+                  }
+                })();
             })
             .catch(err => {
                 setError(`API error: ${err.message}. Loading static data.`);
@@ -290,6 +411,28 @@ const staticRecommendations = staticRecipeDetails.slice(1, 4).map(r => ({ ...r, 
     }
   }, [id]);
 
+  // Check if current user has saved this recipe already
+  useEffect(() => {
+    const checkSaved = async () => {
+      if (!currentUser || !recipe) return;
+      try {
+        const resp = await getAllSavedItems(currentUser.id);
+        const items = resp?.data ?? resp ?? [];
+        const found = (items || []).find((it: any) => it.resourceType === 'RECIPE' && String(it.resourceId) === String(recipe.id));
+        if (found) {
+          setSaved(true);
+          setSaveRecordId(found.id);
+        } else {
+          setSaved(false);
+          setSaveRecordId(null);
+        }
+      } catch (e) {
+        // ignore — saved state remains false
+      }
+    };
+    checkSaved();
+  }, [currentUser, recipe]);
+
   const handleLike = async () => {
     if (!recipe || liked || !currentUser) return;
     try {
@@ -302,12 +445,56 @@ const staticRecommendations = staticRecipeDetails.slice(1, 4).map(r => ({ ...r, 
   }
 
   const handleSave = async () => {
-    if (!recipe || saved || !currentUser) return;
+    if (!recipe || !currentUser) return;
     try {
-        await saveResource({ userId: currentUser.id, resourceType: 'RECIPE', resourceId: parseInt(recipe.id) });
-        setSaved(true);
+        if (!saved) {
+            const resp = await saveResource({ userId: currentUser.id, resourceType: 'RECIPE', resourceId: parseInt(recipe.id) });
+            // If server returns saved item id, store it for potential unsave
+            const savedId = resp?.data?.id ?? resp?.id ?? null;
+            if (savedId) setSaveRecordId(Number(savedId));
+            setSaved(true);
+        } else {
+            // unsave: call unsaveResource if we have the record id
+            if (saveRecordId) {
+                await unsaveResource(saveRecordId);
+                setSaved(false);
+                setSaveRecordId(null);
+            } else {
+                // fallback: refetch saved items and try remove the matching record
+                const resp = await getAllSavedItems(currentUser.id);
+                const items = resp?.data ?? resp ?? [];
+                const found = (items || []).find((it: any) => it.resourceType === 'RECIPE' && String(it.resourceId) === String(recipe.id));
+                if (found) {
+                    await unsaveResource(found.id);
+                }
+                setSaved(false);
+                setSaveRecordId(null);
+            }
+        }
     } catch (err: any) {
-        setError("Failed to save recipe. Please try again.");
+        setError("Failed to update saved state. Please try again.");
+    }
+  }
+
+  // Share handler: Web Share API or clipboard fallback
+  const handleShare = async () => {
+    try {
+      const url = window.location.href;
+      const title = recipe?.title || 'Recipe';
+      if (navigator.share) {
+        await navigator.share({ title, url });
+        setShareMessage('Shared successfully');
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        setShareMessage('Link copied to clipboard');
+      } else {
+        // fallback alert
+        window.prompt('Copy this link to share', url);
+        setShareMessage('Link ready to copy');
+      }
+      setTimeout(() => setShareMessage(null), 3000);
+    } catch (e) {
+      setError('Failed to share recipe.');
     }
   }
 
@@ -320,6 +507,86 @@ const staticRecommendations = staticRecipeDetails.slice(1, 4).map(r => ({ ...r, 
         setError("Failed to follow chef. Please try again.");
     }
   }
+
+  // Text-to-Speech helpers
+  const buildSpeechChunks = (r: Recipe) => {
+    const chunks: string[] = [];
+    chunks.push(r.title);
+    if (r.description) chunks.push(r.description);
+    chunks.push(`This recipe serves ${r.servings} and takes approximately ${r.prepTime + r.cookTime} minutes to make.`);
+    if (r.ingredients && r.ingredients.length) {
+      const ingText = r.ingredients.map(i => `${i.amount ?? ''} ${i.unit ?? ''} ${i.name}`).join('. ');
+      chunks.push(`Ingredients: ${ingText}.`);
+    }
+    if (r.instructions && r.instructions.length) {
+      r.instructions.forEach(inst => {
+        chunks.push(`Step ${inst.stepNumber}: ${inst.content}`);
+      });
+    }
+    return chunks;
+  };
+
+  const prepareUtterances = (r: Recipe) => {
+    if (!synthRef) return null;
+    const chunks = buildSpeechChunks(r);
+    const voices = synthRef.getVoices ? synthRef.getVoices() : [];
+    const preferred = voices.find((v: any) => /en/i.test(v.lang)) || voices[0] || null;
+    const utterances: SpeechSynthesisUtterance[] = chunks.map((txt, idx) => {
+      const u = new SpeechSynthesisUtterance(txt);
+      u.rate = 1.02;
+      u.pitch = 1.05;
+      if (preferred) u.voice = preferred;
+      u.onend = () => {
+        if (idx === chunks.length - 1) {
+          setIsSpeaking(false);
+          setIsPaused(false);
+        }
+      };
+      return u;
+    });
+    utterancesRef.current = utterances;
+    return utterances;
+  };
+
+  const startSpeaking = (r: Recipe) => {
+    if (!synthRef) {
+      setError('Text-to-speech is not supported in this browser.');
+      return;
+    }
+    if (synthRef.speaking && !synthRef.paused) return;
+    if (synthRef.paused) {
+      synthRef.resume();
+      setIsPaused(false);
+      setIsSpeaking(true);
+      return;
+    }
+    const utterances = prepareUtterances(r);
+    if (!utterances || utterances.length === 0) return;
+    synthRef.cancel();
+    utterances.forEach(u => synthRef.speak(u));
+    setIsSpeaking(true);
+    setIsPaused(false);
+  };
+
+  const togglePauseResume = () => {
+    if (!synthRef) return;
+    if (!synthRef.speaking) return;
+    if (synthRef.paused) {
+      synthRef.resume();
+      setIsPaused(false);
+    } else {
+      synthRef.pause();
+      setIsPaused(true);
+    }
+  };
+
+  const stopSpeaking = () => {
+    if (!synthRef) return;
+    synthRef.cancel();
+    utterancesRef.current = null;
+    setIsSpeaking(false);
+    setIsPaused(false);
+  };
 
   const handleAddComment = async () => {
       if (!recipe || !newComment.trim() || !currentUser) return;
@@ -368,7 +635,17 @@ const staticRecommendations = staticRecipeDetails.slice(1, 4).map(r => ({ ...r, 
                 <Button onClick={handleSave} variant="outline" className={`rounded-lg gap-2 ${saved ? 'bg-orange-50 border-orange-500 text-orange-600' : 'text-gray-600'}`}>
                   <Bookmark className="h-5 w-5" fill={saved ? "currentColor" : "none"}/>
                 </Button>
-                 <Button variant="outline" className="rounded-lg gap-2 text-gray-600"><Share2 className="h-5 w-5" /></Button>
+                <Button onClick={() => { if (!isSpeaking) startSpeaking(recipe); else togglePauseResume(); }} variant="outline" className="rounded-lg gap-2 text-gray-600">
+                  <Volume2 className="h-5 w-5" />
+                  <span className="hidden sm:inline">{!isSpeaking ? 'Speak' : isPaused ? 'Resume' : 'Pause'}</span>
+                </Button>
+                {isSpeaking && (
+                  <Button onClick={stopSpeaking} variant="ghost" className="rounded-lg gap-2 text-sm text-gray-600">Stop</Button>
+                )}
+                <Button onClick={handleShare} variant="outline" className="rounded-lg gap-2 text-gray-600">
+                  <Share2 className="h-5 w-5" />
+                </Button>
+                {shareMessage && <div className="text-sm text-gray-600 mt-1">{shareMessage}</div>}
               </div>
             </div>
             {/* Key Info */}
@@ -413,8 +690,8 @@ const staticRecommendations = staticRecipeDetails.slice(1, 4).map(r => ({ ...r, 
               <Card className="p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Comments ({recipe.comments.length})</h2>
                 <div className="space-y-4 mb-6">
-                  {recipe.comments.map((comment: any) => (
-                    <div key={comment.id} className="border-b pb-4 last:border-b-0">
+                  {recipe.comments.map((comment: any, idx: number) => (
+                    <div key={comment.id ?? `comment-${idx}`} className="border-b pb-4 last:border-b-0">
                       <div className="flex gap-3">
                         <img src={comment.author.profile?.url || 'https://avatar.vercel.sh/' + comment.author.username} alt={comment.author.displayName} className="h-10 w-10 rounded-full object-cover" />
                         <div className="flex-1">
@@ -446,8 +723,8 @@ const staticRecommendations = staticRecipeDetails.slice(1, 4).map(r => ({ ...r, 
                 <Card className="p-6">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2"><ChefHat className="h-5 w-5 text-orange-500" /> Similar Recipes</h3>
                     <div className="space-y-4">
-                        {recommendations.map(rec => (
-                            <Link to={`/recipe/${rec.id}`} key={rec.id} className="block hover:bg-gray-100 rounded-lg p-2 transition-colors">
+                        {recommendations.map((rec, idx) => (
+                          <Link to={`/recipes/${rec.id}`} key={`${rec.id ?? 'rec'}-${idx}`} className="block hover:bg-gray-100 rounded-lg p-2 transition-colors">
                                 <div className="flex gap-4">
                                     <img src={rec.image} alt={rec.title} className="h-16 w-16 rounded-lg object-cover" />
                                     <div>
