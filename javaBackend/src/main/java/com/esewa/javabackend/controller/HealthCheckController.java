@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/health")
+@RequestMapping({ "/api/health", "/health" })
 public class HealthCheckController extends BaseController {
 
   @GetMapping

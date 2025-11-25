@@ -1,6 +1,5 @@
 package com.esewa.javabackend.module;
 
-
 import com.esewa.javabackend.enums.MediaType;
 import com.esewa.javabackend.enums.Privacy;
 import com.esewa.javabackend.module.base.AuditingEntity;
@@ -22,8 +21,11 @@ import java.util.*;
 @Table(name = "posts")
 public class Post extends AuditingEntity {
 
+    // ...existing code...
+
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @SequenceGenerator(name = "posts_id_seq", sequenceName = "posts_id_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "posts_id_seq")
     private Integer id;
 
     @ManyToOne(optional = false)
@@ -32,7 +34,8 @@ public class Post extends AuditingEntity {
     @Column(columnDefinition = "TEXT")
     private String contentText;
 
-    @OneToMany(mappedBy = "post", cascade =  CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<Media> medias = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
@@ -40,15 +43,18 @@ public class Post extends AuditingEntity {
 
     private boolean pinned;
 
+    @Column(name = "is_new", nullable = false)
+    @Builder.Default
+    private boolean isNew = false;
+
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private Set<Comment> comments = new HashSet<>();
 
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private Set<Reaction> reactions = new HashSet<>();
 
 
     private boolean isNew = true;
 }
-
-
-

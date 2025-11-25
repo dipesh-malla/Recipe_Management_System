@@ -18,9 +18,9 @@ import Messages from "./pages/Messages";
 import MyProfile  from "./pages/MyProfile";
 import NotFound from "./pages/NotFound";
 import EditRecipePage from "./pages/EditRecipePage";
-import RecipeDetailPage from "./pages/RecipeDetailPage";
 import SystemStatus from "./pages/SystemStatus";
 import ChefsDiscovery from "./pages/ChefsDiscovery";
+import Discover from "./pages/Discover";
 import UserProfilePage from "./pages/UserProfilePage";
 
 const queryClient = new QueryClient();
@@ -37,6 +37,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/recipes" element={<RecipeBrowse />} />
+          <Route path="/recipes/:id" element={<RecipeDetail />} />
           <Route path="/recipe/:id" element={<RecipeDetail />} />
           <Route path="/create-recipe" element={<CreateRecipe />} />
           <Route path="/notifications" element={<Notifications />} />
@@ -44,8 +45,9 @@ const App = () => (
           <Route path="/profile" element={<MyProfile />} />
           <Route path="/profile/:userId" element={<UserProfilePage />} />
           <Route path="/chefs" element={<ChefsDiscovery />} />
+          <Route path="/discover" element={<Discover />} />
           <Route path="/recipes/edit/:id" element={<EditRecipePage />} /> 
-          <Route path="/recipe/:id" element={<RecipeDetailPage />} />
+          {/* legacy static detail page removed in favor of dynamic RecipeDetail */}
           <Route path="/system-status" element={<SystemStatus />} />
 
 
@@ -60,3 +62,19 @@ const App = () => (
 );
 
 createRoot(document.getElementById("root")!).render(<App />);
+
+// Register service worker in production builds (simple registration for SW in public/sw.js)
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  // Only register in production builds to avoid interfering with HMR in dev
+  try {
+    if (import.meta.env && import.meta.env.PROD) {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        console.log('Service worker registered:', reg.scope);
+      }).catch((err) => {
+        console.warn('Service worker registration failed:', err);
+      });
+    }
+  } catch (e) {
+    // import.meta may not be available in all environments — ignore registration errors
+  }
+}

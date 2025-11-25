@@ -13,11 +13,18 @@ public class BaseController {
     private CustomMessageSource messageSource;
 
     protected <T> GlobalApiResponse<T> successResponse(T data, Messages message, Object... args) {
+        String resolvedMessage;
+        // If caller passed a single String as an explicit message, use it directly
+        if (args != null && args.length == 1 && args[0] instanceof String) {
+            resolvedMessage = (String) args[0];
+        } else {
+            resolvedMessage = messageSource.getMessage(message.getCode(), args, Locale.ENGLISH);
+        }
 
         return GlobalApiResponse.<T>builder()
                 .success(true)
                 .responseCode(String.valueOf(HttpStatus.OK.value()))
-                .message(messageSource.getMessage(message.getCode(), args, Locale.ENGLISH))
+                .message(resolvedMessage)
                 .data(data)
                 .build();
     }
@@ -30,5 +37,3 @@ public class BaseController {
                 .build();
     }
 }
-
-

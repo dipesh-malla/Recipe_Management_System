@@ -1,11 +1,26 @@
 import MainLayout from "@/components/MainLayout";
-// Update the import path to the correct relative location if necessary
-import UserProfile from "../components/UserProfile";
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getCurrentUser } from '@/lib/api';
 
+// Redirect /profile to the dynamic profile route for the current user
 export default function MyProfile() {
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const user = getCurrentUser();
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+        // Navigate to /profile/:userId so the profile page is bookmarkable and consistent
+        navigate(`/profile/${user.id}`, { replace: true });
+    }, [navigate]);
+
     return (
         <MainLayout>
-            <UserProfile />
+            {/* Redirecting to dynamic profile... */}
+            <div />
         </MainLayout>
     );
 }

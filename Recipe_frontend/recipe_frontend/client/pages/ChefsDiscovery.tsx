@@ -15,18 +15,23 @@ import {
   Sparkles
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   followUser,
   unfollowUser,
   getCurrentUser,
   getAllUsers,
+  getChefs,
+  getTrendingChefs,
   isFollowing,
+  getFollowing,
+  isJavaBackendAvailable,
   getUserRecipes,
   getSimilarUsersPost,
   getUserById,
   getUserStatByUserId,
 } from "@/lib/api";
+import { getCache, setCache, buildUsersKey, invalidateCacheForUser } from "@/lib/cache";
 
 interface UserProfile {
   id: number;
@@ -52,39 +57,150 @@ export default function ChefsDiscovery() {
   const [recommendedChefs, setRecommendedChefs] = useState<UserProfile[]>([]);
   const [trendingChefs, setTrendingChefs] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialSort = (searchParams.get("sort") as "recipes" | "followers" | "newest") || "recipes";
+  const [sortBy, setSortBy] = useState<"recipes" | "followers" | "newest">(initialSort);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(0);
+  const initialPage = Number(searchParams.get("page") ?? 0);
+  const [currentPage, setCurrentPage] = useState(initialPage);
   const [totalPages, setTotalPages] = useState(0);
   const [totalUsers, setTotalUsers] = useState(0);
   const currentUser = getCurrentUser();
   const pageSize = 10;
+  const SEARCH_PAGE_SIZE = 16;
+  const isSearching = Boolean(searchQuery);
 
   const formatUser = (user: any): UserProfile => {
-    const stats = user.stats || {};
+    const stats = user.stats || user.profileStats || {};
+    const followers = user.followersCount ?? user.followers ?? stats.followersCount ?? stats.followers ?? user.followers_count ?? 0;
+    const recipes = user.recipeCount ?? user.recipes ?? stats.recipeCount ?? stats.recipes ?? user.recipe_count ?? 0;
+    const displayName = user.displayName || user.name || user.username || `User ${user.id}`;
+    const username = user.username || (`user${user.id}`);
+    const profileUrl = user.profileUrl || user.profile?.url || user.avatar || `https://i.pravatar.cc/150?u=${username}`;
+
     return {
       id: user.id,
-      displayName: user.displayName || user.username || `User ${user.id}`,
-      username: user.username || `user${user.id}`,
+      displayName,
+      username,
       email: user.email,
-      bio: user.bio || "Passionate about creating delicious recipes",
-      profileUrl: user.profileUrl || `https://i.pravatar.cc/150?u=${user.username || user.id}`,
-      stats: stats,
-      recipesCount: stats.recipeCount || 0,
-      followersCount: stats.followersCount || 0,
-      followingCount: stats.followingCount || 0,
-      expertise: user.expertise || [],
-      isFollowing: user.isFollowing || false,
+      bio: user.bio || user.description || "Passionate about creating delicious recipes",
+      profileUrl,
+      stats,
+      recipesCount: Number(recipes) || 0,
+      followersCount: Number(followers) || 0,
+      followingCount: Number(user.followingCount ?? stats.followingCount ?? user.following ?? 0) || 0,
+      expertise: user.expertise || user.skills || [],
+      isFollowing: Boolean(user.isFollowing),
     };
   };
 
   // Fetch real users from database with pagination
-  const fetchAllUsers = async (page = 0) => {
+  const fetchAllUsers = async (page = 0, size = pageSize) => {
     try {
       setIsLoading(true);
-      const response = await getAllUsers(page, pageSize);
-      
+      const cacheKey = buildUsersKey(page, size, sortBy, searchQuery);
+      const cached = getCache<any>(cacheKey);
+      if (cached) {
+        console.log(`[cache] hit ${cacheKey}`);
+        // reuse cached payload shape
+        const data = cached;
+        // When cache stores raw array or paginated response, normalize similar to live fetch
+        const paginatedData = data?.data ?? data;
+        let users = Array.isArray(paginatedData.data) ? paginatedData.data :
+                     Array.isArray(paginatedData.content) ? paginatedData.content :
+                     Array.isArray(paginatedData) ? paginatedData : [];
+        // If pagination metadata present in cached response, restore it
+        if (paginatedData.totalPages !== undefined) {
+          setTotalPages(paginatedData.totalPages);
+          setTotalUsers(paginatedData.totalElements || 0);
+          setCurrentPage(paginatedData.currentPage || page);
+        }
+        if (currentUser?.id) users = users.filter((u: any) => u.id !== currentUser.id);
+        let formattedUsers = users.map(formatUser);
+        // Enrich cached users with server-side stats (so sorting by recipes/followers works)
+        try {
+          const statsPromises = formattedUsers.map(async (u) => {
+            try {
+              const statResp = await getUserStatByUserId(u.id);
+              if (statResp?.success && statResp.data) {
+                const s = statResp.data;
+                return { id: u.id, stats: s, recipeCount: s.recipeCount ?? s.recipes ?? s.recipe_count ?? 0, followersCount: s.followersCount ?? s.followers ?? 0 };
+              }
+              return { id: u.id };
+            } catch (e) {
+              return { id: u.id };
+            }
+          });
+
+          const statsResults = await Promise.all(statsPromises);
+          const statsMap = statsResults.reduce((acc: any, cur: any) => { acc[cur.id] = cur; return acc; }, {});
+
+          formattedUsers = formattedUsers.map(u => {
+            const s = statsMap[u.id];
+            if (s) {
+              return {
+                ...u,
+                stats: s.stats || u.stats,
+                recipesCount: Number(s.recipeCount ?? u.recipesCount ?? 0) || 0,
+                followersCount: Number(s.followersCount ?? u.followersCount ?? 0) || 0,
+              };
+            }
+            return u;
+          });
+        } catch (e) {
+          console.warn('Failed to enrich cached users with stats:', e);
+        }
+
+        formattedUsers = sortUsers(formattedUsers, sortBy);
+        setAllUsers(formattedUsers);
+        setFilteredUsers(sortUsers(formattedUsers, sortBy));
+        // Fetch global trending chefs from server (non-blocking) with client cache
+        (async () => {
+          try {
+            const tKey = `trending:6`;
+            const cachedT = getCache<any>(tKey);
+            if (cachedT) {
+              const raw = cachedT.data ?? cachedT;
+              const trendingFormatted = (Array.isArray(raw) ? raw : raw?.content ?? raw?.data ?? [])
+                .map(formatUser)
+                .slice(0, 6);
+              setTrendingChefs(trendingFormatted);
+            } else {
+              const tresp = await getTrendingChefs(6);
+              if (tresp?.success && tresp.data) {
+                setCache(tKey, tresp, 300);
+                const raw = tresp.data;
+                const trendingFormatted = (Array.isArray(raw) ? raw : raw?.content ?? raw?.data ?? [])
+                  .map(formatUser)
+                  .slice(0, 6);
+                setTrendingChefs(trendingFormatted);
+              }
+            }
+          } catch (e) {
+            // fallback to local page-based trending
+            setTrendingChefs([...formattedUsers].slice(0, 6));
+          }
+        })();
+        setIsLoading(false);
+        // prefetch next page in background
+        (async () => {
+          const nextKey = buildUsersKey(page + 1, size, sortBy, searchQuery);
+          if (!getCache(nextKey)) {
+            try {
+              const resp = await getAllUsers(page + 1, size);
+              setCache(nextKey, resp, 60);
+            } catch (e) {}
+          }
+        })();
+        return;
+      }
+
+      console.log(`[cache] miss ${cacheKey} — fetching`);
+      // Use server-side chefs endpoint for search + sorting so results are globally consistent
+      const response = await getChefs(page, size, searchQuery || undefined, sortBy, "DESC");
       console.log("getAllUsers response:", response);
       
       if (!response.success || !response.data) {
@@ -114,18 +230,111 @@ export default function ChefsDiscovery() {
       }
 
       // Format users immediately without follow status for instant display
-      const formattedUsers = users.map(formatUser);
+      let formattedUsers = users.map(formatUser);
+
+      // Enrich each user with server-side stats (if available) to get accurate recipe counts
+      try {
+        const statsPromises = formattedUsers.map(async (u) => {
+          try {
+            const statResp = await getUserStatByUserId(u.id);
+            if (statResp?.success && statResp.data) {
+              const s = statResp.data;
+              return { id: u.id, stats: s, recipeCount: s.recipeCount ?? s.recipes ?? s.recipe_count ?? 0, followersCount: s.followersCount ?? s.followers ?? 0 };
+            }
+            return { id: u.id };
+          } catch (e) {
+            return { id: u.id };
+          }
+        });
+
+        const statsResults = await Promise.all(statsPromises);
+        const statsMap = statsResults.reduce((acc: any, cur: any) => { acc[cur.id] = cur; return acc; }, {});
+
+        formattedUsers = formattedUsers.map(u => {
+          const s = statsMap[u.id];
+          if (s) {
+            return {
+              ...u,
+              stats: s.stats || u.stats,
+              recipesCount: Number(s.recipeCount ?? u.recipesCount ?? 0) || 0,
+              followersCount: Number(s.followersCount ?? u.followersCount ?? 0) || 0,
+            };
+          }
+          return u;
+        });
+      } catch (e) {
+        console.warn('Failed to enrich users with stats:', e);
+      }
+
+      // Sort according to current sortBy (default: recipes)
+      formattedUsers = sortUsers(formattedUsers, sortBy);
+
+      // If a user is logged in, remove users they already follow so they don't appear in discovery
+      if (currentUser?.id) {
+        try {
+          const followingResp = await getFollowing(currentUser.id);
+          let followingIds: number[] = [];
+          if (followingResp) {
+            // support shapes: { success:true, data:[{id,...}] } or plain array
+            if (Array.isArray(followingResp)) {
+              followingIds = followingResp.map((f: any) => f.id).filter(Boolean);
+            } else if (followingResp.data && Array.isArray(followingResp.data)) {
+              followingIds = followingResp.data.map((f: any) => f.id).filter(Boolean);
+            } else if (followingResp.success && followingResp.data && Array.isArray(followingResp.data)) {
+              followingIds = followingResp.data.map((f: any) => f.id).filter(Boolean);
+            }
+          }
+          const followSet = new Set<number>(followingIds);
+          if (followSet.size > 0) {
+            formattedUsers = formattedUsers.filter(u => !followSet.has(u.id));
+          }
+        } catch (e) {
+          // ignore follow fetch errors — we'll still show users but background job may later remove them
+        }
+      }
+
       setAllUsers(formattedUsers);
-      setFilteredUsers(formattedUsers);
+      setFilteredUsers(sortUsers(formattedUsers, sortBy));
+      // cache raw response for faster next loads (cache the original response object)
+      try {
+        setCache(cacheKey, response, 60);
+      } catch (e) {
+        // ignore cache errors
+      }
+      console.log(`Loaded ${formattedUsers.length} users (page ${page})`);
       
-      // Set top trending chefs by followers count
-      const trending = [...formattedUsers]
-        .sort((a, b) => (b.followersCount || 0) - (a.followersCount || 0))
-        .slice(0, 6);
-      setTrendingChefs(trending);
+      // Fetch global trending chefs from server (non-blocking)
+      (async () => {
+        try {
+          const tKey = `trending:6`;
+          const cachedT = getCache<any>(tKey);
+          if (cachedT) {
+            const raw = cachedT.data ?? cachedT;
+            const trendingFormatted = (Array.isArray(raw) ? raw : raw?.content ?? raw?.data ?? [])
+              .map(formatUser)
+              .slice(0, 6);
+            setTrendingChefs(trendingFormatted);
+          } else {
+            const tresp = await getTrendingChefs(6);
+            if (tresp?.success && tresp.data) {
+              setCache(tKey, tresp, 300);
+              const raw = tresp.data;
+              const trendingFormatted = (Array.isArray(raw) ? raw : raw?.content ?? raw?.data ?? [])
+                .map(formatUser)
+                .slice(0, 6);
+              setTrendingChefs(trendingFormatted);
+            } else {
+              setTrendingChefs([...formattedUsers].sort((a, b) => (b.recipesCount || 0) - (a.recipesCount || 0)).slice(0, 6));
+            }
+          }
+        } catch (e) {
+          setTrendingChefs([...formattedUsers].sort((a, b) => (b.recipesCount || 0) - (a.recipesCount || 0)).slice(0, 6));
+        }
+      })();
 
       // Fetch follow status in background (non-blocking)
       if (currentUser?.id) {
+        // Fetch follow status in background but don't block rendering
         fetchFollowStatusInBackground(formattedUsers);
       }
 
@@ -140,41 +349,51 @@ export default function ChefsDiscovery() {
     try {
       // Batch check follow status (limit to first 50 for performance)
       const usersToCheck = users.slice(0, 50);
-      
       const followStatusPromises = usersToCheck.map(async (user) => {
         try {
           const followResponse = await isFollowing(currentUser!.id, user.id);
-          return {
-            userId: user.id,
-            isFollowing: followResponse.success && followResponse.data === true
-          };
-        } catch {
+          // followResponse may be {success:true,data:true} or boolean
+          const isF = (followResponse && typeof followResponse === 'object') ? (followResponse.data === true || followResponse === true) : Boolean(followResponse);
+          return { userId: user.id, isFollowing: Boolean(isF) };
+        } catch (err) {
           return { userId: user.id, isFollowing: false };
         }
       });
 
-      const followStatuses = await Promise.allSettled(followStatusPromises);
-      
-      // Update all user lists with follow status
-      const updateUsers = (userList: UserProfile[]) =>
-        userList.map(user => {
-          const statusResult = followStatuses.find(
-            (result) => result.status === 'fulfilled' && result.value.userId === user.id
-          );
-          if (statusResult && statusResult.status === 'fulfilled') {
-            return { ...user, isFollowing: statusResult.value.isFollowing };
-          }
-          return user;
-        });
+      const followStatuses = await Promise.all(followStatusPromises);
 
-      setAllUsers(updateUsers);
-      setFilteredUsers(updateUsers);
-      setRecommendedChefs(prev => updateUsers(prev));
-      setTrendingChefs(prev => updateUsers(prev));
+      // Map for quick lookup
+      const followMap = followStatuses.reduce((acc, cur) => { acc[cur.userId] = cur.isFollowing; return acc; }, {} as Record<number, boolean>);
+
+      // Remove any users that are already followed from the discovery lists
+      const followedIds = new Set<number>(followStatuses.filter(f => f.isFollowing).map(f => f.userId));
+      if (followedIds.size > 0) {
+        const removeFollowed = (list: UserProfile[]) => list.filter(u => !followedIds.has(u.id));
+        setAllUsers(prev => removeFollowed(prev));
+        setFilteredUsers(prev => removeFollowed(prev));
+        setRecommendedChefs(prev => removeFollowed(prev));
+        setTrendingChefs(prev => removeFollowed(prev));
+      } else {
+        const updateUsers = (userList: UserProfile[]) =>
+          userList.map(user => ({ ...user, isFollowing: !!followMap[user.id] }));
+
+        setAllUsers(prev => updateUsers(prev));
+        setFilteredUsers(prev => updateUsers(prev));
+        setRecommendedChefs(prev => updateUsers(prev));
+        setTrendingChefs(prev => updateUsers(prev));
+      }
     } catch (err) {
       console.error("Failed to fetch follow statuses:", err);
       // Silently fail - users already displayed without follow status
     }
+  };
+
+  const sortUsers = (users: UserProfile[], sort: "recipes" | "followers" | "newest") => {
+    const copy = [...users];
+    if (sort === "recipes") return copy.sort((a, b) => (b.recipesCount || 0) - (a.recipesCount || 0));
+    if (sort === "followers") return copy.sort((a, b) => (b.followersCount || 0) - (a.followersCount || 0));
+    // newest: assume higher id = newer
+    return copy.sort((a, b) => (b.id || 0) - (a.id || 0));
   };
 
   const fetchRecommendedChefs = async () => {
@@ -200,35 +419,67 @@ export default function ChefsDiscovery() {
         console.log("Fetching user details for IDs:", recommendedUserIds);
         
         // Fetch all recommended users and their stats in parallel
+        // If Java backend is down, fall back to resolving recommended IDs from already-loaded `allUsers`.
+        const javaUp = isJavaBackendAvailable();
         const userAndStatsPromises = recommendedUserIds.map(async (userId: number) => {
           try {
+            if (!javaUp) {
+              // Try to find user details in the already-fetched `allUsers` array
+              const local = allUsers.find(u => u.id === userId);
+              if (local) return local;
+              // If not present locally, skip instead of throwing
+              return null;
+            }
+
             const [userRes, statsRes] = await Promise.all([
               getUserById(userId),
               getUserStatByUserId(userId)
             ]);
-            
+
             if (userRes?.success && userRes.data) {
               const userData = userRes.data;
-              // Attach stats to user object
               userData.stats = statsRes?.success ? statsRes.data : {};
               return userData;
             }
             return null;
           } catch (err) {
             console.warn(`Failed to fetch user ${userId}:`, err);
+            // Don't fail the whole batch if an individual fetch fails
             return null;
           }
         });
-        
+
         const userResponses = await Promise.all(userAndStatsPromises);
         
         // Filter out null values and format users
-        const mlRecommendedChefs = userResponses
+        let mlRecommendedChefs = userResponses
           .filter((user: any) => user !== null)
           .map(formatUser);
-        
+
         if (mlRecommendedChefs.length > 0) {
+          // Order ML recommendations by recipe count (most recipes first)
+          mlRecommendedChefs = mlRecommendedChefs.sort((a, b) => (b.recipesCount || 0) - (a.recipesCount || 0));
           console.log(`Successfully fetched ${mlRecommendedChefs.length} ML-powered recommendations with stats`);
+          // Remove any users the current user already follows
+          if (currentUser?.id) {
+            try {
+              const followingResp = await getFollowing(currentUser.id);
+              let followingIds: number[] = [];
+              if (followingResp) {
+                if (Array.isArray(followingResp)) {
+                  followingIds = followingResp.map((f: any) => f.id).filter(Boolean);
+                } else if (followingResp.data && Array.isArray(followingResp.data)) {
+                  followingIds = followingResp.data.map((f: any) => f.id).filter(Boolean);
+                }
+              }
+              const followSet = new Set<number>(followingIds);
+              if (followSet.size > 0) {
+                mlRecommendedChefs = mlRecommendedChefs.filter(u => !followSet.has(u.id));
+              }
+            } catch (e) {
+              // ignore
+            }
+          }
           setRecommendedChefs(mlRecommendedChefs);
           return;
         } else {
@@ -239,7 +490,7 @@ export default function ChefsDiscovery() {
       // Fallback to popularity-based recommendations if ML fails
       console.log("ML recommendations failed or empty, falling back to popularity-based");
       const top6 = [...allUsers]
-        .sort((a, b) => (b.followersCount || 0) - (a.followersCount || 0))
+        .sort((a, b) => (b.recipesCount || 0) - (a.recipesCount || 0))
         .slice(0, 6);
       setRecommendedChefs(top6);
       
@@ -256,11 +507,34 @@ export default function ChefsDiscovery() {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await fetchAllUsers(currentPage);
+      await fetchAllUsers(currentPage, isSearching ? SEARCH_PAGE_SIZE : pageSize);
       setIsLoading(false);
     };
     loadData();
   }, [currentPage]);
+
+  // keep the URL in sync with currentPage so external links can deep-link
+  useEffect(() => {
+    const pageParam = Number(searchParams.get("page") ?? 0);
+    if (pageParam !== currentPage) {
+      // update the URL without losing other params
+      const newParams = new URLSearchParams(searchParams as any);
+      newParams.set("page", String(currentPage));
+      newParams.set("sort", sortBy);
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [currentPage]);
+
+  // persist sort in URL whenever it changes
+  useEffect(() => {
+    const newParams = new URLSearchParams(searchParams as any);
+    newParams.set("sort", sortBy);
+    newParams.set("page", String(0));
+    setSearchParams(newParams, { replace: true });
+    // when sort changes, reset to first page and re-fetch
+    setCurrentPage(0);
+    fetchAllUsers(0, isSearching ? SEARCH_PAGE_SIZE : pageSize);
+  }, [sortBy]);
 
   useEffect(() => {
     if (allUsers.length > 0) {
@@ -268,40 +542,106 @@ export default function ChefsDiscovery() {
     }
   }, [allUsers]);
 
+  // We only update `searchQuery` when the user presses Enter.
+  // This prevents triggering searches while the user is still typing.
+
+  // Apply search + sort whenever the debounced query, allUsers or sort changes
   useEffect(() => {
-    if (searchTerm.trim()) {
-      const filtered = allUsers.filter((user) =>
-        user.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    const term = searchQuery;
+    let filtered = allUsers;
+    if (term) {
+      filtered = allUsers.filter((user) =>
+        user.displayName.toLowerCase().includes(term) ||
+        user.email?.toLowerCase().includes(term) ||
+        user.username.toLowerCase().includes(term)
       );
-      setFilteredUsers(filtered);
-    } else {
-      setFilteredUsers(allUsers);
     }
-  }, [searchTerm, allUsers]);
+    // apply selected sort
+    filtered = sortUsers(filtered, sortBy);
+    setFilteredUsers(filtered);
+  }, [searchQuery, allUsers, sortBy]);
+
+  // Re-apply sorting to trending/recommended when sortBy changes
+  useEffect(() => {
+    setTrendingChefs(prev => sortUsers(prev, sortBy).slice(0, 6));
+    setRecommendedChefs(prev => sortUsers(prev, sortBy).slice(0, 6));
+  }, [sortBy]);
 
   const handleFollow = async (userId: number) => {
     if (!currentUser?.id) {
       window.location.href = "/login";
       return;
     }
+    // Defensive: if UI already knows this user is followed, don't call follow endpoint
+    const findUser = () => {
+      return allUsers.find(u => u.id === userId) || filteredUsers.find(u => u.id === userId) || recommendedChefs.find(u => u.id === userId) || trendingChefs.find(u => u.id === userId);
+    };
+
+    const local = findUser();
+    if (local?.isFollowing) {
+      // remove silently
+      const removeChefFromLists = (users: UserProfile[]) => users.filter(u => u.id !== userId);
+      setAllUsers(prev => removeChefFromLists(prev));
+      setFilteredUsers(prev => removeChefFromLists(prev));
+      setRecommendedChefs(prev => removeChefFromLists(prev));
+      setTrendingChefs(prev => removeChefFromLists(prev));
+      try { invalidateCacheForUser(userId); } catch (e) { /* ignore */ }
+      try { window.dispatchEvent(new CustomEvent('follow-changed', { detail: { followerId: currentUser.id, followeeId: userId, action: 'follow' } })); } catch (e) {}
+      return;
+    }
+
+    // Double-check server-side follow status to avoid 409s caused by stale UI
+    try {
+      const checkResp = await isFollowing(currentUser.id, userId);
+      const serverFollows = (checkResp && typeof checkResp === 'object') ? (checkResp.data === true || checkResp === true) : Boolean(checkResp);
+      if (serverFollows) {
+        const removeChefFromLists = (users: UserProfile[]) => users.filter(u => u.id !== userId);
+        setAllUsers(prev => removeChefFromLists(prev));
+        setFilteredUsers(prev => removeChefFromLists(prev));
+        setRecommendedChefs(prev => removeChefFromLists(prev));
+        setTrendingChefs(prev => removeChefFromLists(prev));
+        try { invalidateCacheForUser(userId); } catch (e) { /* ignore */ }
+        try { window.dispatchEvent(new CustomEvent('follow-changed', { detail: { followerId: currentUser.id, followeeId: userId, action: 'follow' } })); } catch (e) {}
+        return;
+      }
+    } catch (e) {
+      // If the check failed, continue to attempt the follow — we'll handle 409s gracefully below
+    }
 
     try {
-      await followUser(currentUser.id, userId);
-      
-      // Update UI optimistically
-      const updateFollowState = (users: UserProfile[]) =>
-        users.map(u => 
-          u.id === userId 
-            ? { ...u, isFollowing: true, followersCount: (u.followersCount || 0) + 1 } 
-            : u
-        );
-      
-      setAllUsers(updateFollowState);
-      setFilteredUsers(updateFollowState);
-      setRecommendedChefs(updateFollowState);
-      setTrendingChefs(updateFollowState);
+      const resp = await followUser(currentUser.id, userId);
+      // On success: remove the chef from discovery lists
+      const removeChefFromLists = (users: UserProfile[]) => users.filter(u => u.id !== userId);
+      setAllUsers(prev => removeChefFromLists(prev));
+      setFilteredUsers(prev => removeChefFromLists(prev));
+      setRecommendedChefs(prev => removeChefFromLists(prev));
+      setTrendingChefs(prev => removeChefFromLists(prev));
+      try { invalidateCacheForUser(userId); } catch (e) { /* ignore */ }
+
+      // Dispatch a follow-changed event with the canonical server response so other components can update
+      try {
+        const detail = resp?.data ? { followerId: currentUser.id, followeeId: userId, action: 'follow', follow: resp.data } : { followerId: currentUser.id, followeeId: userId, action: 'follow' };
+        window.dispatchEvent(new CustomEvent('follow-changed', { detail }));
+      } catch (e) {
+        // ignore event dispatch failures
+      }
     } catch (err: any) {
+      const msg = String(err?.message || "").toLowerCase();
+      // Treat Already-following / 409 as success (idempotent)
+      if (msg.includes("already following") || msg.includes("alreadyfollow") || msg.includes("409") ) {
+        const removeChefFromLists = (users: UserProfile[]) => users.filter(u => u.id !== userId);
+        setAllUsers(prev => removeChefFromLists(prev));
+        setFilteredUsers(prev => removeChefFromLists(prev));
+        setRecommendedChefs(prev => removeChefFromLists(prev));
+        setTrendingChefs(prev => removeChefFromLists(prev));
+        try { invalidateCacheForUser(userId); } catch (e) { /* ignore */ }
+        try {
+          window.dispatchEvent(new CustomEvent('follow-changed', { detail: { followerId: currentUser.id, followeeId: userId, action: 'follow' } }));
+        } catch (e) {}
+        return;
+      }
+
+      // Unexpected error — surface it
       console.error("Failed to follow user:", err);
       setError("Failed to follow user. Please try again.");
     }
@@ -312,19 +652,39 @@ export default function ChefsDiscovery() {
 
     try {
       await unfollowUser(currentUser.id, userId);
-      
-      // Update UI optimistically
+
       const updateFollowState = (users: UserProfile[]) =>
         users.map(u => 
           u.id === userId 
-            ? { ...u, isFollowing: false, followersCount: Math.max((u.followersCount || 0) - 1, 0) } 
+            ? { ...u, isFollowing: false, followersCount: Math.max((u.followersCount || 1) - 1, 0) } 
             : u
         );
-      
-      setAllUsers(updateFollowState);
-      setFilteredUsers(updateFollowState);
-      setRecommendedChefs(updateFollowState);
-      setTrendingChefs(updateFollowState);
+
+      setAllUsers(prev => updateFollowState(prev));
+      setFilteredUsers(prev => updateFollowState(prev));
+      setRecommendedChefs(prev => updateFollowState(prev));
+      setTrendingChefs(prev => updateFollowState(prev));
+      try { window.dispatchEvent(new CustomEvent('follow-changed', { detail: { followerId: currentUser.id, followeeId: userId, action: 'unfollow' } })); } catch (e) {}
+
+      // re-check server follow status
+      try {
+        const resp = await isFollowing(currentUser.id, userId);
+        const serverFollows = (resp && typeof resp === 'object') ? (resp.data === true || resp === true) : Boolean(resp);
+        if (serverFollows) {
+          // rollback if server still sees following
+          const rollback = (users: UserProfile[]) => users.map(u => u.id === userId ? { ...u, isFollowing: true, followersCount: (u.followersCount || 0) + 1 } : u);
+          setAllUsers(prev => rollback(prev));
+          setFilteredUsers(prev => rollback(prev));
+          setRecommendedChefs(prev => rollback(prev));
+          setTrendingChefs(prev => rollback(prev));
+        }
+        else {
+          // Invalidate client cache entries that may contain this user
+          try { invalidateCacheForUser(userId); } catch (e) { /* ignore */ }
+        }
+      } catch (e) {
+        // ignore
+      }
     } catch (err: any) {
       console.error("Failed to unfollow user:", err);
       setError("Failed to unfollow user. Please try again.");
@@ -360,14 +720,36 @@ export default function ChefsDiscovery() {
                 placeholder="Search chefs by name..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const q = searchTerm.trim().toLowerCase();
+                    setSearchQuery(q);
+                    setCurrentPage(0);
+                    // Fetch server-side results with default search page size 16
+                    fetchAllUsers(0, 16);
+                  }
+                }}
                 className="pl-12 pr-4 py-3 rounded-lg bg-gray-50 border-gray-300 text-lg"
               />
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <label className="text-sm text-gray-600">Sort by:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="px-3 py-2 border rounded bg-white text-sm"
+                aria-label="Sort chefs"
+              >
+                <option value="recipes">Most Recipes</option>
+                <option value="followers">Most Followers</option>
+                <option value="newest">Newest</option>
+              </select>
             </div>
           </div>
         </div>
 
         {/* ML-Powered Recommendations */}
-        {recommendedChefs.length > 0 && (
+        {recommendedChefs.length > 0 && !isSearching && (
           <div className="bg-gradient-to-r from-orange-50 to-red-50 border-b border-orange-100">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
@@ -391,11 +773,12 @@ export default function ChefsDiscovery() {
 
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Tabs defaultValue="all" className="w-full">
+          {!isSearching ? (
+            <Tabs defaultValue="all" className="w-full">
             <TabsList className="grid w-full max-w-md grid-cols-2 mb-8">
               <TabsTrigger value="all" className="gap-2">
                 <Users className="h-4 w-4" />
-                All Chefs ({filteredUsers.length})
+                All Chefs ({totalUsers || filteredUsers.length})
               </TabsTrigger>
               <TabsTrigger value="trending" className="gap-2">
                 <TrendingUp className="h-4 w-4" />
@@ -481,7 +864,36 @@ export default function ChefsDiscovery() {
                 ))}
               </div>
             </TabsContent>
-          </Tabs>
+            </Tabs>
+          ) : (
+            // Simplified search results view when searching: show only the matched users (up to SEARCH_PAGE_SIZE)
+            <div>
+              {isLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(6)].map((_, i) => (
+                    <Card key={i} className="h-64 animate-pulse bg-gray-200" />
+                  ))}
+                </div>
+              ) : filteredUsers.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredUsers.slice(0, SEARCH_PAGE_SIZE).map((chef) => (
+                      <ChefCard
+                        key={chef.id}
+                        chef={chef}
+                        onFollow={handleFollow}
+                        onUnfollow={handleUnfollow}
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <Card className="p-12 text-center">
+                  <p className="text-gray-500">No chefs found. Try adjusting your search.</p>
+                </Card>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </MainLayout>
@@ -494,13 +906,36 @@ const ChefCard = ({
   onUnfollow,
 }: {
   chef: UserProfile;
-  onFollow: (id: number) => void;
-  onUnfollow: (id: number) => void;
+  onFollow: (id: number) => Promise<void> | void;
+  onUnfollow: (id: number) => Promise<void> | void;
 }) => {
   const [imgError, setImgError] = useState(false);
+  const [btnLoading, setBtnLoading] = useState(false);
   const imageUrl = imgError 
     ? `https://i.pravatar.cc/150?u=${chef.username || chef.id}`
     : chef.profileUrl || `https://i.pravatar.cc/150?u=${chef.username || chef.id}`;
+
+  const handleFollowClick = async () => {
+    setBtnLoading(true);
+    try {
+      await onFollow(chef.id);
+    } catch (e) {
+      // swallow, outer handler will set error state
+    } finally {
+      setBtnLoading(false);
+    }
+  };
+
+  const handleUnfollowClick = async () => {
+    setBtnLoading(true);
+    try {
+      await onUnfollow(chef.id);
+    } catch (e) {
+      // swallow
+    } finally {
+      setBtnLoading(false);
+    }
+  };
 
   return (
     <Card className="overflow-hidden hover:shadow-xl transition-shadow">
@@ -554,18 +989,20 @@ const ChefCard = ({
           <Button
             variant="outline"
             className="w-full gap-2"
-            onClick={() => onUnfollow(chef.id)}
+            onClick={handleUnfollowClick}
+            disabled={btnLoading}
           >
             <UserCheck className="h-4 w-4" />
-            Following
+            {btnLoading ? 'Processing...' : 'Following'}
           </Button>
         ) : (
           <Button
             className="w-full gap-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-            onClick={() => onFollow(chef.id)}
+            onClick={handleFollowClick}
+            disabled={btnLoading}
           >
             <UserPlus className="h-4 w-4" />
-            Follow
+            {btnLoading ? 'Processing...' : 'Follow'}
           </Button>
         )}
       </div>

@@ -1,6 +1,5 @@
 package com.esewa.javabackend.service;
 
-
 import com.esewa.javabackend.config.CustomMessageSource;
 import com.esewa.javabackend.config.kafka.InteractionProducer;
 import com.esewa.javabackend.dto.Base.response.PaginatedDtoResponse;
@@ -44,7 +43,7 @@ public class PostService {
     private final PostMapper postMapper;
     private final FileStorageService fileStorageService;
     private final CustomMessageSource messageSource;
-    private final InteractionService   interactionService;
+    private final InteractionService interactionService;
     private final InteractionProducer interactionProducer;
 
     private final String className = this.getClass().getName();
@@ -60,11 +59,17 @@ public class PostService {
             throw new IllegalArgumentException("PostDTO cannot be null");
         }
 
-        Post post = Optional.ofNullable(postDTO.getId())
-                .map(id -> postRepository.findById(id)
-                        .orElseThrow(() -> new ResourceNotFoundException(
-                                messageSource.getMessage("post.not.found", "Post"))))
-                .orElseGet(Post::new);
+        Post post;
+        if (postDTO.getId() != null) {
+            // Update: fetch existing post
+            post = postRepository.findById(postDTO.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            messageSource.getMessage("post.not.found", "Post")));
+        } else {
+            // Create: always start with id = null
+            post = new Post();
+            post.setId(null);
+        }
 
         // Set author
         if (post.getId() == null && postDTO.getAuthorId() != null) {
@@ -77,7 +82,11 @@ public class PostService {
         // Update post fields
         postMapper.updatePostFromDTO(postDTO, post);
 
-        post.setNew(true);
+        // Always null id for new posts (let DB assign)
+        if (postDTO.getId() == null) {
+            post.setId(null);
+        }
+
         // Save post to get ID
         post = postRepository.save(post);
 
@@ -85,13 +94,15 @@ public class PostService {
         if (files != null && !files.isEmpty()) {
             List<Media> mediaList = new ArrayList<>();
             for (MultipartFile file : files) {
-                String folder = Objects.requireNonNull(file.getContentType()).startsWith("image/") ? "post/image" : "post/video";
+                String contentType = file.getContentType();
+                boolean isImage = contentType != null && contentType.startsWith("image/");
+                String folder = isImage ? "post/image" : "post/video";
                 String fileUrl = fileStorageService.upload(file, folder);
 
                 Media media = Media.builder()
                         .post(post)
-//                        .owner(post.getAuthor())
-                        .type(file.getContentType().startsWith("image/") ? MediaType.IMAGE : MediaType.VIDEO)
+                        // .owner(post.getAuthor())
+                        .type(isImage ? MediaType.IMAGE : MediaType.VIDEO)
                         .url(fileUrl)
                         .moderationStatus(ModerationStatus.APPROVED)
                         .build();
@@ -102,17 +113,19 @@ public class PostService {
             post.setMedias(mediaList);
         }
 
-        interactionProducer.sendInteraction(
-                InteractionEvent.builder()
-                        .userId(postDTO.getAuthorId())
-                        .resourceType(ResourceType.POST)
-                        .resourceId(post.getId())
-                        .action(InteractionAction.CREATE)
-                        .value(2.0)
-                        .isNew(true)
-                        .build()
-        );
-
+        try {
+            interactionProducer.sendInteraction(
+                    InteractionEvent.builder()
+                            .userId(postDTO.getAuthorId())
+                            .resourceType(ResourceType.POST)
+                            .resourceId(post.getId())
+                            .action(InteractionAction.CREATE)
+                            .value(2.0)
+                            .build());
+        } catch (Exception e) {
+            log.warn("{} - {} - Interaction send failed (non-fatal): {}", className, AppUtil.getMethodName(),
+                    e.getMessage());
+        }
 
         return post.getId();
     }
@@ -135,21 +148,22 @@ public class PostService {
     @Transactional
     public PostResponseDTO getPostResponseById(Integer id) {
 
-
-
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         messageSource.getMessage(Messages.NOT_FOUND.getCode(), "Post")));
-        interactionProducer.sendInteraction(
-                InteractionEvent.builder()
-                        .userId(post.getAuthor().getId())
-                        .resourceType(ResourceType.POST) // or ResourceType.RECIPE
-                        .resourceId(id)
-                        .action(InteractionAction.VIEW)
-                        .value(1.0)
-                        .isNew(true)
-                        .build()
-        );
+        try {
+            interactionProducer.sendInteraction(
+                    InteractionEvent.builder()
+                            .userId(post.getAuthor().getId())
+                            .resourceType(ResourceType.POST) // or ResourceType.RECIPE
+                            .resourceId(id)
+                            .action(InteractionAction.VIEW)
+                            .value(1.0)
+                            .build());
+        } catch (Exception e) {
+            log.warn("{} - {} - Interaction send failed (non-fatal): {}", className, AppUtil.getMethodName(),
+                    e.getMessage());
+        }
         return postMapper.toResponseDTO(post);
     }
 
@@ -184,8 +198,7 @@ public class PostService {
         PageRequest pageable = PageRequest.of(
                 filter.getPagination().getPage(),
                 filter.getPagination().getSize(),
-                Sort.by(Sort.Direction.fromString(filter.getSortOrder()), filter.getSortBy())
-        );
+                Sort.by(Sort.Direction.fromString(filter.getSortOrder()), filter.getSortBy()));
 
         // Fetch paginated posts with specifications
         Page<Post> postsPage = postRepository.findAll(PostSpecification.buildSpecification(filter), pageable);
@@ -219,9 +232,7 @@ public class PostService {
                             .resourceId(id)
                             .action(InteractionAction.VIEW)
                             .value(-1.0)
-                            .isNew(true)
-                            .build()
-            );
+                            .build());
 
             postRepository.deleteById(id);
             return true;
@@ -230,8 +241,6 @@ public class PostService {
             return false;
         }
     }
-
-
 
     @Transactional
     public List<PostResponseDTO> findPostByUserId(Integer id) {

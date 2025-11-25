@@ -87,6 +87,9 @@ export default function Header() {
 
     const isActive = (path: string) => location.pathname === path;
 
+    // Simpler search behaviour: user types, then presses Enter to search (like landing page).
+    const [searchTerm, setSearchTerm] = useState((window as any)._headerSearchTerm || '');
+
     return (
         <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white shadow-sm">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -110,10 +113,28 @@ export default function Header() {
                         </nav>
                     )}
 
-                    <div className="hidden lg:flex items-center flex-1 max-w-xs mx-8">
+                    <div className="hidden lg:flex items-center flex-1 max-w-md mx-8">
                         <div className="relative w-full">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <Input placeholder="Search recipes, chefs..." className="pl-10 pr-4 rounded-full bg-gray-100 border-0 focus:bg-white focus:ring-2 focus:ring-orange-500" />
+                            <Input
+                                value={searchTerm}
+                                onChange={(e: any) => setSearchTerm(e.target.value)}
+                                placeholder="Search recipes, chefs..."
+                                className="pl-10 pr-4 rounded-full bg-gray-100 border-0 focus:bg-white focus:ring-2 focus:ring-orange-500"
+                                onKeyDown={(e: any) => {
+                                    if (e.key === 'Enter') {
+                                        // Heuristic: if the user typed a likely chef/username query,
+                                        // navigate directly to chef search. Else default to recipes.
+                                        const term = (searchTerm || '').trim();
+                                        const lower = term.toLowerCase();
+                                        const isUserIdLike = /^user\s*\d+$/i.test(term);
+                                        const isChefPrefix = /^chef\b/i.test(term);
+                                        const isHandle = /^@\w+/.test(term);
+                                        const section = (isUserIdLike || isChefPrefix || isHandle) ? 'chefs' : 'recipes';
+                                        navigate(`/discover?search=${encodeURIComponent(term)}&section=${section}`);
+                                    }
+                                }}
+                            />
                         </div>
                     </div>
 

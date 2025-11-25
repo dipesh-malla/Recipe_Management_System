@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <style>
+    .box { fill:#ffffff; stroke:#2b6cb0; stroke-width:2; rx:8; }
+    .title { font: bold 16px sans-serif; fill:#1a365d }
+    .label { font: 13px sans-serif; fill:#0f172a }
+    .small { font: 11px sans-serif; fill:#334155 }
+    .arrow { stroke:#0f172a; stroke-width:2; marker-end: url(#arrowhead); }
+  </style>
+
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#0f172a" />
+    </marker>
+  </defs>
+
+  <!-- Browser / Client -->
+  <rect x="40" y="40" width="220" height="80" class="box" />
+  <text x="150" y="70" text-anchor="middle" class="title">Browser</text>
+  <text x="150" y="92" text-anchor="middle" class="small">React UI (Vite)</text>
+
+  <!-- Frontend -->
+  <rect x="320" y="30" width="300" height="120" class="box" />
+  <text x="470" y="60" text-anchor="middle" class="title">Frontend</text>
+  <text x="470" y="82" text-anchor="middle" class="label">Search, Discovery, Offline SW</text>
+
+  <!-- Java Backend -->
+  <rect x="680" y="20" width="320" height="140" class="box" />
+  <text x="840" y="50" text-anchor="middle" class="title">Java Backend</text>
+  <text x="840" y="76" text-anchor="middle" class="label">Spring Boot — API, Events, Persistence</text>
+
+  <!-- Database -->
+  <rect x="680" y="190" width="220" height="80" class="box" />
+  <text x="790" y="220" text-anchor="middle" class="title">PostgreSQL</text>
+  <text x="790" y="242" text-anchor="middle" class="small">Persistent data (users, recipes)</text>
+
+  <!-- Kafka and Redis -->
+  <rect x="980" y="190" width="200" height="80" class="box" />
+  <text x="1080" y="220" text-anchor="middle" class="title">Kafka</text>
+  <text x="1080" y="242" text-anchor="middle" class="small">Interactions topic</text>
+
+  <rect x="980" y="300" width="200" height="60" class="box" />
+  <text x="1080" y="335" text-anchor="middle" class="title">Redis</text>
+  <text x="1080" y="354" text-anchor="middle" class="small">Cache (ML results)</text>
+
+  <!-- ML Backend -->
+  <rect x="320" y="300" width="300" height="120" class="box" />
+  <text x="470" y="330" text-anchor="middle" class="title">ML Backend</text>
+  <text x="470" y="354" text-anchor="middle" class="label">Two-Tower, ALS, Embeddings</text>
+
+  <!-- Arrows -->
+  <line x1="260" y1="80" x2="320" y2="80" class="arrow" />
+  <line x1="620" y1="80" x2="680" y2="80" class="arrow" />
+
+  <line x1="840" y1="160" x2="840" y2="190" class="arrow" />
+  <line x1="900" y1="230" x2="980" y2="230" class="arrow" />
+
+  <line x1="620" y1="340" x2="680" y2="340" class="arrow" />
+  <line x1="620" y1="340" x2="620" y2="320" stroke="#0f172a" stroke-width="1" />
+
+  <line x1="620" y1="360" x2="760" y2="360" class="arrow" />
+  <text x="690" y="352" class="small" text-anchor="middle">JDBC / Kafka</text>
+
+  <line x1="620" y1="330" x2="980" y2="330" class="arrow" />
+  <text x="800" y="320" class="small" text-anchor="middle">Events (interactions)</text>
+
+  <!-- Footer note -->
+  <text x="600" y="700" class="small" text-anchor="middle">Diagram: Browser → Frontend → Java Backend → (Postgres, Kafka) ; ML Backend consumes Kafka and uses Redis cache</text>
+</svg>

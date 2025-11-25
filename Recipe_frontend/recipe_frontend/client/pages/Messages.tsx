@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
-import { getCurrentUser, getConversations, getMessages, sendMessage, markMessagesAsRead } from "@/lib/api";
+import { getCurrentUser, getConversations, getMessages, sendMessage, markMessagesAsRead, getFollowing } from "@/lib/api";
 import { Link } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { Send, Search, MessageCircle } from "lucide-react";
@@ -31,11 +31,13 @@ const staticMessages: Message[] = [
 
 export default function Messages() {
     const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [following, setFollowing] = useState<any[]>([]);
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [error, setError] = useState<string | null>(null);
-    const currentUser = getCurrentUser();
+    // Keep a stable reference for the current user so effects don't re-run on every render
+    const [currentUser] = useState(() => getCurrentUser());
 
     useEffect(() => {
         const fetchConversations = async () => {
@@ -45,22 +47,56 @@ export default function Messages() {
                 return;
             }
             try {
-                const response = await getConversations();
-                setConversations(response.data);
+                const response = await getConversations(currentUser?.id);
+                // response might be a GlobalApiResponse or an array fallback
+                const convsRaw = response?.data ?? (Array.isArray(response) ? response : []);
+                const convs = (convsRaw || []).map((c: any) => ({
+                    id: c.conversationId ?? c.id ?? 0,
+                    participant: { id: c.otherUserId ?? c.participant?.id ?? 0, displayName: c.otherUserName ?? c.participant?.displayName ?? 'Unknown', profile: { url: c.participant?.profile?.url || `https://i.pravatar.cc/150?u=${c.otherUserId ?? 0}` } },
+                    lastMessage: { id: 0, sender: { id: c.otherUserId ?? 0, displayName: c.otherUserName ?? '' }, receiver: { id: currentUser?.id, displayName: 'You' }, body: c.lastMessage ?? '', createdDate: c.lastMessageTime ?? new Date().toISOString(), read: true },
+                    unreadCount: c.unreadCount ?? 0,
+                } as Conversation));
+                setConversations(convs);
             } catch (err: any) {
                 setError(`Failed to fetch conversations: ${err.message}. Displaying static data.`);
                 setConversations(staticConversations);
             }
         };
         fetchConversations();
-    }, [currentUser]);
+    }, [currentUser?.id]);
+
+    // Fetch the first 3 users the current user is following for quick messaging
+    useEffect(() => {
+        const fetchFollowing = async () => {
+            if (!currentUser) return;
+            try {
+                const resp = await getFollowing(currentUser.id);
+                const list = resp?.data ?? [];
+                setFollowing(Array.isArray(list) ? list.slice(0, 3) : []);
+            } catch (e) {
+                // fallback: empty
+                setFollowing([]);
+            }
+        };
+        fetchFollowing();
+    }, [currentUser?.id]);
 
     useEffect(() => {
         if (selectedConversation && currentUser) {
             const fetchMessages = async () => {
                 try {
                     const response = await getMessages(selectedConversation.participant.id);
-                    setMessages(response.data);
+                    // response may be an array of MessageDTO or a wrapped object; normalize to UI Message shape
+                    const raw = response?.data ?? (Array.isArray(response) ? response : []);
+                    const normalized = (raw || []).map((m: any) => ({
+                        id: m.id,
+                        sender: m.sender ? m.sender : { id: m.senderId, displayName: m.senderName, profile: { url: '' } },
+                        receiver: m.receiver ? m.receiver : { id: m.receiverId, displayName: '', profile: { url: '' } },
+                        body: m.body,
+                        createdDate: m.sentAt ?? m.createdDate ?? new Date().toISOString(),
+                        read: m.isRead ?? false,
+                    }));
+                    setMessages(normalized);
                     if (selectedConversation.unreadCount > 0) {
                         await markMessagesAsRead(selectedConversation.participant.id);
                         setConversations(prev => prev.map(c => c.id === selectedConversation.id ? { ...c, unreadCount: 0 } : c));
@@ -72,7 +108,8 @@ export default function Messages() {
             };
             fetchMessages();
         }
-    }, [selectedConversation, currentUser]);
+    // Only refetch messages when selected conversation participant id changes or current user id changes
+    }, [selectedConversation?.participant?.id, currentUser?.id]);
 
     const handleSendMessage = async () => {
         if (!newMessage.trim() || !selectedConversation || !currentUser) return;
@@ -100,7 +137,21 @@ export default function Messages() {
                 {error && <p className="text-red-500 bg-red-100 p-3 rounded-lg mb-4">{error}</p>}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <Card className="md:col-span-1 p-0">
-                        <div className="p-4 border-b"><Input placeholder="Search conversations..." /></div>
+                        <div className="p-4 border-b">
+                            <Input placeholder="Search conversations..." />
+                            <div className="mt-3 flex gap-3">
+                                {following && following.length > 0 ? (
+                                    following.map((u: any) => (
+                                        <button key={u.id} onClick={() => setSelectedConversation({ id: 0, participant: { id: u.id, displayName: u.displayName || u.username, profile: { url: u.profile || u.profileUrl || `https://i.pravatar.cc/150?u=${u.id}` } }, lastMessage: { id: 0, sender: { id: u.id, displayName: u.displayName }, receiver: { id: currentUser?.id, displayName: 'You' }, body: '', createdDate: new Date().toISOString(), read: true }, unreadCount: 0 } as Conversation)} className="flex flex-col items-center text-sm">
+                                            <img src={u.profile || u.profileUrl || `https://i.pravatar.cc/150?u=${u.id}`} alt={u.displayName || u.username || 'User'} className="h-10 w-10 rounded-full object-cover" />
+                                            <span className="mt-1 text-xs">{u.displayName || u.username}</span>
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className="text-sm text-gray-500">No quick contacts</div>
+                                )}
+                            </div>
+                        </div>
                         <ul className="divide-y divide-gray-200">
                             {conversations.map(convo => (
                                 <li key={convo.id} onClick={() => setSelectedConversation(convo)} className={`p-4 flex gap-4 cursor-pointer ${selectedConversation?.id === convo.id ? 'bg-orange-50' : 'hover:bg-gray-50'}`}>

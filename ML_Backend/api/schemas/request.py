@@ -124,6 +124,19 @@ class SyncRecipesRequest(BaseModel):
     recipes: List[dict] = Field(..., description="List of recipe data dictionaries", min_length=1)
 
 
+class RecipeSimilarityRequest(BaseModel):
+    """Request model for finding similar recipes by recipe id."""
+    recipe_id: int = Field(..., description="Recipe ID to find similar recipes for", ge=1)
+    top_k: int = Field(6, description="Number of similar recipes to return", ge=1, le=50)
+
+    model_config = {"json_schema_extra": {
+        "example": {
+            "recipe_id": 10182,
+            "top_k": 6
+        }
+    }}
+
+
 class SyncInteractionsRequest(BaseModel):
     """Request to sync interaction data."""
     interactions: List[dict] = Field(..., description="List of interaction data dictionaries", min_length=1)

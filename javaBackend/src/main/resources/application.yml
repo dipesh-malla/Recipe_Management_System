@@ -4,9 +4,9 @@ spring:
   application:
     name: recipe-management-app
   datasource:
-    url: jdbc:postgresql://localhost:5432/recipe_db
-    username: postgres
-    password: password
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://dpg-d4hisjemcj7s73c2och0-a.singapore-postgres.render.com:5432/recipe_sh82}
+    username: ${SPRING_DATASOURCE_USERNAME:recipe_sh82_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:pmpooOr3Ue2nUhdaAPPjmpnwh5CKmvcJ}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 30

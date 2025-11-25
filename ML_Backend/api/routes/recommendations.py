@@ -7,6 +7,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, status
 from api.schemas.request import (
     RecipeRecommendationRequest,
+    RecipeSimilarityRequest,
     UserSimilarityRequest,
     BatchRecommendationRequest,
     ColdStartRequest
@@ -325,3 +326,33 @@ async def get_cold_start_recommendations(request: ColdStartRequest) -> RecipeRec
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+@router.post("/recipes/similar", response_model=RecipeRecommendationResponse)
+async def get_similar_recipes(request: RecipeSimilarityRequest) -> RecipeRecommendationResponse:
+    """
+    Find recipes similar to a given recipe id using recipe embeddings.
+    """
+    recommendation_service = get_recommendation_service()
+    start_time = time.time()
+    try:
+        recommendations, model_used, latency_ms = await recommendation_service.get_similar_recipes(
+            recipe_id=request.recipe_id,
+            top_k=request.top_k
+        )
+
+        return RecipeRecommendationResponse(
+            user_id=0,
+            recommendations=recommendations,
+            model_used=model_used,
+            cached=False,
+            latency_ms=latency_ms,
+            total_candidates=len(recommendations)
+        )
+
+    except ValueError as e:
+        logger.warning(f"Recipe similarity validation error for {request.recipe_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"Recipe similarity error for {request.recipe_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

@@ -9,9 +9,10 @@ import { Link } from "react-router-dom";
 import { 
   getAllPosts, 
   createOrUpdatePost, 
-  getRecipeRecommendationsGet, 
   getCurrentUser,
-  getAllRecipes
+  getAllRecipes,
+  getLatestPosts,
+  getPostsPage
 } from "@/lib/api";
 import Post from "@/components/Post";
 import { Post as PostType } from "@shared/api";
@@ -36,192 +37,192 @@ interface Recipe {
 
 export default function Feed() {
   const [posts, setPosts] = useState<PostType[]>([]);
-  const [recommendedRecipes, setRecommendedRecipes] = useState<Recipe[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [page, setPage] = useState<number>(0);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [trendingRecipes, setTrendingRecipes] = useState<Recipe[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [newPostContent, setNewPostContent] = useState("");
   const [newPostImage, setNewPostImage] = useState<File | null>(null);
-  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(true);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const currentUser = getCurrentUser();
 
   const fetchPosts = async () => {
     try {
-      const response = await getAllPosts();
-      const formattedPosts = response.data.map((post: any) => ({
-        id: post.id,
-        author: {
-          id: post.author.id,
-          displayName: post.author.displayName,
-          profile: post.author.profile,
-        },
-        contentText: post.contentText,
-        media: post.medias,
-        reactionsCount: post.reactionsCount,
-        comments: post.comments || [],
-        createdDate: new Date(post.createdDate).toISOString(),
-      }));
-      setPosts(formattedPosts);
-    } catch (err: any) {
-      setError(err.message);
-      setPosts(staticFeedData);
-    }
-  }
+      setLoading(true);
+      console.debug("Feed: fetching posts...");
 
-  const fetchRecommendations = async () => {
-    setIsLoadingRecommendations(true);
-    try {
-      // Try to get personalized recommendations from ML backend
-      if (currentUser?.id) {
-        const mlResponse = await getRecipeRecommendationsGet(currentUser.id, 50);
-        if (mlResponse?.recommendations) {
-          // Use the backend JSON structure directly
-          setRecommendedRecipes(mlResponse.recommendations);
+      // Show demo data immediately while the network request runs
+      if (!posts || posts.length === 0) {
+        setPosts(staticFeedData);
+      }
+
+      // request latest 10 posts via filter endpoint
+      const response = await getLatestPosts(10);
+      console.debug("Feed: raw response from getAllPosts:", response);
+
+      // Normalize response shape used by backend: response.data.data -> paginated DTO
+      let raw = response?.data?.data ?? response?.data ?? response;
+      let arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : []);
+
+      // If we didn't find an array yet, attempt to find any nested array in the response object
+      const findFirstArray = (obj: any): any[] | null => {
+        if (!obj || typeof obj !== "object") return null;
+        if (Array.isArray(obj)) return obj;
+        for (const k of Object.keys(obj)) {
+          const found = findFirstArray(obj[k]);
+          if (found) return found;
+        }
+        return null;
+      };
+
+      if (arr.length === 0) {
+        const nested = findFirstArray(response);
+        if (nested && Array.isArray(nested)) {
+          arr = nested;
+          console.debug("Feed: extracted nested array from response, length=", arr.length);
         }
       }
-    } catch (err: any) {
-      console.error("Failed to fetch ML recommendations:", err);
-      // Fallback to showing trending recipes from database
-      try {
-        const recipesResponse = await getAllRecipes(0, 50); // Get first 50 recipes
-        const recipes = recipesResponse.data?.content || recipesResponse.data || [];
-        const topRecipes = recipes.slice(0, 50).map((recipe: any, index: number) => ({
-          recipe_id: recipe.recipe_id || recipe.id || `recipe-${index}`,
-          title: recipe.title,
-          cuisine: recipe.cuisine,
-          dietary_type: recipe.dietary_type,
-          cook_time: recipe.cook_time || recipe.cookTime,
-          difficulty: recipe.difficulty,
-          calories_per_serving: recipe.calories_per_serving,
-          avg_rating: recipe.avg_rating,
-          chef: recipe.chef || recipe.author?.displayName || recipe.author || "Unknown Chef",
-          likes: recipe.likes ?? recipe.like_count ?? 0,
-          comments: recipe.comments ?? recipe.comment_count ?? 0,
-          image: recipe.media?.[0]?.url || recipe.image || "https://placehold.co/400x300/e2e8f0/64748b?text=Recipe+Image",
-        }));
-        setRecommendedRecipes(topRecipes);
-      } catch (err2: any) {
-        console.error("Failed to fetch recipes:", err2);
-      }
-    } finally {
-      setIsLoadingRecommendations(false);
-    }
-  }
 
-  const fetchTrendingRecipes = async () => {
-    try {
-      const response = await getAllRecipes(0, 20); // Get first 20 recipes for trending
-      // Get top 3 trending recipes (sorted by engagement)
-      const recipes = response.data?.content || response.data || [];
-      const trending = recipes
-        .sort((a: any, b: any) => (b.reactionsCount || 0) - (a.reactionsCount || 0))
-        .slice(0, 3)
-        .map((recipe: any, index: number) => ({
-          recipe_id: recipe.recipe_id || recipe.id || `trending-${index}`,
-          title: recipe.title,
-          image: recipe.media?.[0]?.url || recipe.image || "https://placehold.co/400x300/e2e8f0/64748b?text=Recipe+Image",
-          cuisine: recipe.cuisine,
-          difficulty: recipe.difficulty,
-          cook_time: recipe.cook_time || recipe.cookTime,
-          chef: recipe.chef || recipe.author?.displayName || recipe.author || "Unknown Chef",
-        }));
-      setTrendingRecipes(trending);
+      console.debug("Feed: posts array length after normalization:", Array.isArray(arr) ? arr.length : 0);
+
+      const formattedPosts = arr.map((post: any) => {
+        const author = post?.author || post?.user || {};
+        const medias = post?.medias || post?.mediasDTO || post?.media || post?.mediaDTO || [];
+        const created = post?.createdDate || post?.createdAt || post?.created_on || post?.created_date || post?.created || new Date().toISOString();
+
+        return {
+          id: post.id,
+          author: {
+            id: author.id || post?.author_id || post?.created_by,
+            displayName: author.displayName || author.name || author.username || `User ${author.id || post?.author_id}`,
+            profile: author.profile || (author.profileUrl ? { url: author.profileUrl } : author.avatar ? { url: author.avatar } : undefined),
+          },
+          contentText: post.contentText || post.content || post.content_text || "",
+          media: medias,
+          reactionsCount: (post.reactions && post.reactions.length) || post.reactionsCount || post.like_count || post.likeCount || 0,
+          comments: post.comments || [],
+          commentCount: post.comment_count || post.commentsCount || post.commentCount || 0,
+          createdDate: new Date(created).toISOString(),
+        };
+      });
+
+      if (!formattedPosts || formattedPosts.length === 0) {
+        console.warn("Feed: backend returned no posts — keeping demo posts");
+      } else {
+        // Replace demo posts with real posts once available
+        setPosts(formattedPosts);
+        setPage(1);
+        setHasMore((response?.data?.totalElements ?? 0) > formattedPosts.length);
+      }
+
+      setLoading(false);
     } catch (err: any) {
-      console.error("Failed to fetch trending recipes:", err);
+      console.error("Feed: failed to fetch posts", err);
+      setError(err.message || String(err));
+      // Keep demo data if network error
+      setPosts(staticFeedData);
+      setLoading(false);
     }
-  }
+  };
+
+  // Load next page and append
+  const fetchMorePosts = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const response = await getPostsPage(page, 30);
+      let raw = response?.data?.data ?? response?.data ?? response;
+      let arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : []);
+
+      // Try to find nested array if necessary
+      const findFirstArray = (obj: any): any[] | null => {
+        if (!obj || typeof obj !== "object") return null;
+        if (Array.isArray(obj)) return obj;
+        for (const k of Object.keys(obj)) {
+          const found = findFirstArray(obj[k]);
+          if (found) return found;
+        }
+        return null;
+      };
+      if (arr.length === 0) {
+        const nested = findFirstArray(response);
+        if (nested && Array.isArray(nested)) arr = nested;
+      }
+
+      const formatted = arr.map((post: any) => ({
+        id: post.id,
+        author: post?.author || post?.user || {},
+        contentText: post.contentText || post.content || post.content_text || "",
+        media: post?.medias || post?.media || [],
+        reactionsCount: post.reactionsCount || post.like_count || post.likeCount || 0,
+        comments: post.comments || [],
+        commentCount: post.comment_count || post.commentsCount || post.commentCount || 0,
+        createdDate: post?.createdDate || post?.createdAt || new Date().toISOString(),
+      }));
+
+      if (formatted && formatted.length > 0) {
+        setPosts((prev) => [...prev, ...formatted]);
+        setPage((p) => p + 1);
+        setHasMore((response?.data?.totalElements ?? 0) > (page + 1) * 30);
+      } else {
+        setHasMore(false);
+      }
+    } catch (err: any) {
+      console.error("Feed: failed to fetch more posts", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // sentinel ref for intersection observer
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && hasMore) {
+          fetchMorePosts();
+        }
+      });
+    }, { root: null, rootMargin: '400px', threshold: 0.1 });
+    obs.observe(sentinel);
+    return () => obs.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sentinelRef.current, hasMore]);
+
+  // Create post handler
+  const handleCreatePost = async () => {
+    try {
+      const payload = {
+        contentText: newPostContent,
+        authorId: currentUser?.id ?? undefined,
+        privacy: 'PUBLIC',
+        pinned: false,
+      } as any;
+
+      await createOrUpdatePost(payload, newPostImage ? [newPostImage] : undefined);
+      setNewPostContent("");
+      setNewPostImage(null);
+      await fetchPosts();
+    } catch (err: any) {
+      console.error("Feed: create post failed", err);
+      setError(err.message || String(err));
+    }
+  };
 
   useEffect(() => {
     fetchPosts();
-    fetchRecommendations();
-    fetchTrendingRecipes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleCreatePost = async () => {
-    if (!newPostContent.trim()) return;
-    try {
-      await createOrUpdatePost({ contentText: newPostContent }, newPostImage ? [newPostImage] : undefined);
-      setNewPostContent("");
-      setNewPostImage(null);
-      fetchPosts();
-    } catch (err: any) {
-      setError(err.message);
-    }
-  }
 
   return (
     <MainLayout>
       <div className="relative min-h-screen bg-gray-50">
-        {/* ML-Powered Recommendations Section */}
-        {recommendedRecipes.length > 0 && (
-          <div className="bg-gradient-to-r from-orange-50 to-red-50 border-b border-orange-100">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  <Sparkles className="h-6 w-6 text-orange-500" />
-                  Recommended For You
-                  <Badge className="ml-2 bg-orange-500 text-white">AI Powered</Badge>
-                </h2>
-                <Link to="/recipes">
-                  <Button variant="outline" size="sm">View All</Button>
-                </Link>
-              </div>
-
-              {isLoadingRecommendations ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                  {[...Array(6)].map((_, i) => (
-                    <Card key={i} className="h-48 animate-pulse bg-gray-200" />
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                  {recommendedRecipes.map((recipe) => (
-                    <Link key={recipe.recipe_id} to={`/recipe/${recipe.recipe_id}`}> 
-                      <Card className="group cursor-pointer hover:shadow-lg transition-all overflow-hidden h-full">
-                        <div className="relative h-32 overflow-hidden">
-                          <img
-                            src={recipe.image || "https://placehold.co/400x300/e2e8f0/64748b?text=Recipe+Image"}
-                            alt={recipe.title}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                          />
-                          {recipe.difficulty && (
-                            <Badge className="absolute top-2 right-2 bg-white/90 text-gray-900 text-xs">
-                              {recipe.difficulty}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="p-3">
-                          <h3 className="font-semibold text-sm line-clamp-2 text-gray-900 mb-1">{recipe.title}</h3>
-                          {recipe.cuisine && (
-                            <p className="text-xs text-orange-600 font-medium">{recipe.cuisine}</p>
-                          )}
-                          {recipe.cook_time && (
-                            <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                              <Clock className="h-3 w-3" />
-                              {recipe.cook_time}m
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                            <ChefHat className="h-3 w-3" />
-                            {recipe.chef && recipe.chef.trim() !== "" ? recipe.chef : "Unknown Chef"}
-                            <span className="ml-2">👍 {recipe.likes}</span>
-                            <span className="ml-2">💬 {recipe.comments}</span>
-                          </div>
-                          {recipe.score !== undefined && (
-                            <div className="text-xs text-gray-400 mt-1">Score: {recipe.score.toFixed(3)}</div>
-                          )}
-                          {recipe.reason && (
-                            <div className="text-xs text-gray-400 mt-1">Reason: {recipe.reason}</div>
-                          )}
-                        </div>
-                      </Card>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        
 
         {/* Main Feed Container */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -240,8 +241,20 @@ export default function Feed() {
 
               {/* Posts */}
               <div className="space-y-6">
-                {posts.length > 0 ? (
-                  posts.map((post) => <Post key={post.id} post={post} />)
+                {loading ? (
+                  <Card className="p-8 text-center">
+                    <p className="text-gray-500">Loading posts...</p>
+                  </Card>
+                ) : posts.length > 0 ? (
+                  <>
+                    {posts.map((post) => <Post key={post.id} post={post} />)}
+                    <div ref={sentinelRef} />
+                    {loadingMore && (
+                      <Card className="p-4 text-center">
+                        <p className="text-gray-500">Loading more posts...</p>
+                      </Card>
+                    )}
+                  </>
                 ) : (
                   <Card className="p-12 text-center">
                     <p className="text-gray-500">No posts yet. Be the first to share something!</p>
@@ -261,7 +274,7 @@ export default function Feed() {
                   </div>
                   <div className="space-y-4">
                     {trendingRecipes.map((recipe) => (
-                      <Link key={recipe.recipe_id} to={`/recipe/${recipe.recipe_id}`}>
+                      <Link key={recipe.recipe_id} to={`/recipes/${recipe.recipe_id}`}>
                         <div className="flex gap-3 group cursor-pointer">
                           <img
                             src={recipe.image}
@@ -310,11 +323,11 @@ export default function Feed() {
         <div className="sticky bottom-0 right-0 p-4 lg:p-8 flex justify-center lg:justify-end">
           <Card className="w-full max-w-2xl p-4 shadow-2xl bg-white/95 backdrop-blur-sm border-gray-300">
             <div className="flex gap-4">
-              <img
-                src={currentUser?.profile?.url || "https://placehold.co/100x100/94a3b8/ffffff?text=User"}
-                alt="Your avatar"
-                className="h-12 w-12 rounded-full object-cover"
-              />
+                <img
+                  src={currentUser?.profile?.url || `https://i.pravatar.cc/150?u=${currentUser?.id || 'anon'}`}
+                  alt="Your avatar"
+                  className="h-12 w-12 rounded-full object-cover"
+                />
               <div className="flex-1 space-y-3">
                 <Textarea
                   placeholder="What's cooking? Share your latest creation..."
