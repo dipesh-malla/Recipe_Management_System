@@ -55,12 +55,12 @@ export default function SharedRecipes() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {recipes.map(recipe => (
                     <Card key={recipe.id} className="overflow-hidden">
-                         <Link to={`/recipe/${recipe.id}`}>
+                         <Link to={`/recipes/${recipe.id}`}>
                             <img src={recipe.media?.[0]?.url || 'https://via.placeholder.com/300'} alt={recipe.title} className="w-full h-48 object-cover" />
                         </Link>
                         <div className="p-4">
                             <h3 className="font-bold text-lg hover:underline">
-                               <Link to={`/recipe/${recipe.id}`}>{recipe.title}</Link>
+                               <Link to={`/recipes/${recipe.id}`}>{recipe.title}</Link>
                             </h3>
                             <div className="flex justify-end mt-4">
                                 <Button variant="secondary" size="sm" onClick={() => handleUnshare(recipe.id)}>

@@ -39,11 +39,20 @@ export default function Post({ post }: PostProps) {
     const handleFollow = async () => {
         if (!currentUser || isFollowed) return;
         try {
-            await followUser({ followerId: currentUser.id, followeeId: post.author.id });
-            setIsFollowed(true);
-        } catch (error) {
-            console.error("Failed to follow user:", error);
-        }
+                await followUser({ followerId: currentUser.id, followeeId: post.author.id });
+                setIsFollowed(true);
+                // notify other parts of the app so profile lists update
+                try { window.dispatchEvent(new CustomEvent('follow-changed', { detail: { followerId: currentUser.id, followeeId: post.author.id, action: 'follow' } })); } catch (e) {}
+            } catch (error: any) {
+                const msg = String(error?.message || '').toLowerCase();
+                // Treat already-following as idempotent success
+                if (msg.includes('already following') || msg.includes('409') || msg.includes('alreadyfollow')) {
+                    setIsFollowed(true);
+                    try { window.dispatchEvent(new CustomEvent('follow-changed', { detail: { followerId: currentUser.id, followeeId: post.author.id, action: 'follow' } })); } catch (e) {}
+                    return;
+                }
+                console.error("Failed to follow user:", error);
+            }
     };
 
     return (
@@ -51,7 +60,7 @@ export default function Post({ post }: PostProps) {
             <div className="p-4 flex items-center justify-between border-b">
                 <div className="flex items-center gap-3">
                     <Avatar>
-                        <AvatarImage src={post.author.profile?.url} alt={post.author.displayName} />
+                            <AvatarImage src={post.author.profile?.url || `https://i.pravatar.cc/150?u=${post.author.id}`} alt={post.author.displayName} />
                         <AvatarFallback>{post.author.displayName.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div>
@@ -73,7 +82,7 @@ export default function Post({ post }: PostProps) {
             </div>
 
             {post.media && post.media.length > 0 && (
-                <img src={post.media[0].url} alt="Post content" className="w-full h-auto object-cover" />
+                <img src={post.media[0].url || post.media[0]?.url} alt="Post content" className="w-full h-auto object-cover" />
             )}
 
             <div className="p-4">
@@ -81,12 +90,18 @@ export default function Post({ post }: PostProps) {
 
                 <div className="flex justify-between items-center text-gray-500">
                     <div className="flex gap-4">
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" title={`${post.reactionsCount ?? post.like_count ?? 0} likes`}>
                             <Heart className="h-5 w-5" />
+                            <span className="sr-only">Likes</span>
                         </Button>
-                        <Button variant="ghost" size="icon">
+                        <div className="flex items-center text-xs text-gray-500">{post.reactionsCount ?? post.like_count ?? 0}</div>
+
+                        <Button variant="ghost" size="icon" title={`${(post.comments && post.comments.length) ?? post.comment_count ?? 0} comments`}>
                             <MessageCircle className="h-5 w-5" />
+                            <span className="sr-only">Comments</span>
                         </Button>
+                        <div className="flex items-center text-xs text-gray-500">{(post.comments && post.comments.length) ?? post.comment_count ?? 0}</div>
+
                         <Button variant="ghost" size="icon">
                             <Share2 className="h-5 w-5" />
                         </Button>
