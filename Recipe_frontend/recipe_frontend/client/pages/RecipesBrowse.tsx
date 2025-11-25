@@ -23,7 +23,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { getRecipeRecommendationsPost, getCachedFilteredRecipes } from "@/lib/api";
+import { getRecipeRecommendationsPost, getCachedFilteredRecipes, getRecipeById } from "@/lib/api";
 
 interface Recipe {
   id: number;
@@ -32,7 +32,7 @@ interface Recipe {
   cuisine: string;
   difficulty?: string;
   cookTime: number;
-  author: string;
+  author: { id?: number; displayName: string; profile?: { url?: string } };
   reactions: number;
   comments: number;
 }
@@ -58,7 +58,7 @@ const allRecipesData = Array.from({ length: 24 }, (_, i) => ({
   cuisine: ["Italian", "Thai", "Japanese", "Mediterranean", "French", "Fusion"][ i % 6 ],
   difficulty: ["Easy", "Medium", "Hard"][i % 3],
   cookTime: 15 + (i % 3) * 30,
-  author: ["Chef Marco", "Chef Priya", "Chef Takeshi", "Chef Sofia"][i % 4],
+  author: { displayName: ["Chef Marco", "Chef Priya", "Chef Takeshi", "Chef Sofia"][i % 4], profile: { url: `https://i.pravatar.cc/150?u=chef-${i % 4}` } },
   reactions: Math.floor(Math.random() * 600),
   comments: Math.floor(Math.random() * 150),
 }));
@@ -72,7 +72,7 @@ const staticRecommendedRecipes: Recipe[] = [
         cuisine: "Italian",
         difficulty: "Easy",
         cookTime: 25,
-        author: "Chef Marco",
+        author: { displayName: "Chef Marco", profile: { url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop" } },
         reactions: 452,
         comments: 2,
     },
@@ -83,7 +83,7 @@ const staticRecommendedRecipes: Recipe[] = [
         cuisine: "Thai",
         difficulty: "Medium",
         cookTime: 30,
-        author: "Chef Priya",
+        author: { displayName: "Chef Priya", profile: { url: "https://i.pravatar.cc/150?u=priya" } },
         reactions: 580,
         comments: 0,
     },
@@ -94,7 +94,7 @@ const staticRecommendedRecipes: Recipe[] = [
         cuisine: "Japanese",
         difficulty: "Hard",
         cookTime: 720,
-        author: "Chef Takeshi",
+        author: { displayName: "Chef Takeshi", profile: { url: "https://i.pravatar.cc/150?u=takeshi" } },
         reactions: 890,
         comments: 0,
     },
@@ -120,11 +120,26 @@ export default function RecipesBrowse() {
   const formatRecipe = (recipe: any, index?: number): Recipe => ({
     id: recipe.id || recipe.recipe_id || index || Math.random(),
     title: recipe.title || recipe.name || `Recipe ${recipe.id || recipe.recipe_id || index}`,
-    image: recipe.media?.[0]?.url || recipe.image || "https://placehold.co/400x300/e2e8f0/64748b?text=Recipe+Image",
+    image: recipe.media?.[0]?.url || recipe.image || `https://placehold.co/400x300/e2e8f0/64748b?text=${encodeURIComponent(String(recipe.title || 'Recipe'))}`,
     cuisine: recipe.cuisine,
     difficulty: recipe.difficulty,
     cookTime: recipe.cookTime || recipe.cook_time,
-    author: recipe.authorName || recipe.author?.displayName || recipe.author?.name || recipe.author || recipe.chef || 'Unknown Chef',
+    // Build an author object and prefer explicit profile URLs when available
+    author: (() => {
+      const candidate = recipe.author || recipe.createdBy || recipe.user || recipe.owner || {};
+      const id = candidate?.id || recipe.authorId || recipe.created_by || recipe.ownerId || undefined;
+      const displayName =
+        recipe.authorName ||
+        candidate?.displayName ||
+        candidate?.name ||
+        candidate?.username ||
+        recipe.chef ||
+        recipe.ownerName ||
+        (id ? `User ${id}` : 'Unknown Chef');
+      const profileUrl =
+        candidate?.profile?.url || candidate?.profileUrl || candidate?.avatar || recipe.authorAvatar || recipe.authorProfileUrl || (id ? `https://i.pravatar.cc/150?u=${id}` : undefined);
+      return { id, displayName, profile: profileUrl ? { url: profileUrl } : undefined };
+    })(),
     reactions: recipe.reactionsCount ?? recipe.reactions ?? recipe.likes ?? 0,
     comments: recipe.commentsCount ?? (Array.isArray(recipe.comments) ? recipe.comments.length : 0),
   });
@@ -162,7 +177,7 @@ export default function RecipesBrowse() {
     const pageToFetch = page - 1;
     try {
       const resp = await getCachedFilteredRecipes({ page: pageToFetch, size: ALL_RECIPES_PER_PAGE });
-      const content = respgi?.data?.content || resp?.data || [];
+      const content = resp?.data?.content || resp?.data || [];
       const formatted = (content || []).map((r: any, index: number) => formatRecipe(r, index));
       setAllRecipes(formatted);
       setFilteredRecipes(formatted);
@@ -415,7 +430,7 @@ export default function RecipesBrowse() {
 }
 
 const RecipeCard = ({ recipe }: { recipe: Recipe }) => (
-    <Link to={`/recipe/${recipe.id}`}>
+    <Link to={`/recipes/${recipe.id}`}>
         <Card className="overflow-hidden hover:shadow-xl transition-shadow cursor-pointer h-full flex flex-col group">
         <div className="relative h-48 overflow-hidden bg-gray-200">
             <img
@@ -436,7 +451,10 @@ const RecipeCard = ({ recipe }: { recipe: Recipe }) => (
 
             <div className="flex items-center gap-4 text-sm text-gray-600 pt-2">
                 <div className="flex items-center gap-1"><Clock className="h-4 w-4" /> {recipe.cookTime}m</div>
-                <div className="flex items-center gap-1 truncate"><ChefHat className="h-4 w-4" /> {recipe.author}</div>
+                <div className="flex items-center gap-2 truncate">
+                  <img src={recipe.author.profile?.url || `https://i.pravatar.cc/40?u=${recipe.author.id || recipe.author.displayName}`} alt={recipe.author.displayName} className="h-5 w-5 rounded-full object-cover" />
+                  <div className="flex items-center gap-1"><ChefHat className="h-4 w-4" /> <span className="truncate">{recipe.author.displayName}</span></div>
+                </div>
             </div>
 
             <div className="flex items-center gap-3 text-gray-600 border-t pt-3 mt-auto">
