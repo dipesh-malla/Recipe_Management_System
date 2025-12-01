@@ -20,7 +20,7 @@ A comprehensive, full-stack application for managing recipes, featuring social i
 
 ## 🔭 Overview
 
-The **Recipe Management System** is a modern web application designed to transform how users discover and share culinary experiences. It integrates a robust **Java Spring Boot** backend for core business logic, a **Python FastAPI** service for machine learning-based personalized recommendations, and a responsive **React** frontend for an engaging user experience.
+**RecipeShare** is a modern web application designed to transform how users discover and share culinary experiences. It integrates a robust **Java Spring Boot** backend for core business logic, a **Python FastAPI** service for machine learning-based personalized recommendations, and a responsive **React** frontend for an engaging user experience.
 
 ## 🏗 System Architecture
 
@@ -28,15 +28,54 @@ The system follows a microservices-inspired architecture, ensuring scalability a
 
 ```mermaid
 graph TD
-    Client[React Frontend] -->|HTTP/REST| Java[Java Backend]
-    Java -->|JDBC| DB[(PostgreSQL)]
-    Java -->|Kafka| Kafka{Kafka}
-    Java -->|HTTP| ML[ML Backend]
-    ML -->|Read| DB
-    ML -->|Subscribe| Kafka
-    ML -->|Cache| Redis[(Redis)]
-    Java -->|Search| ES[(Elasticsearch)]
+
+    subgraph Client_Layer["Client Layer"]
+        Web["React Web App"]
+        Mobile["Mobile App"]
+    end
+
+    subgraph Gateway_Layer["API Gateway and Load Balancing"]
+        Nginx["Nginx / Ingress Controller"]
+    end
+
+    subgraph Service_Layer["Microservices Layer"]
+        direction TB
+        Auth["Identity Service (Spring Security + JWT)"]
+        Core["Core Business Service (Spring Boot)"]
+        ML["AI & ML Recommendation Engine (FastAPI + PyTorch)"]
+    end
+
+    subgraph Event_Bus["Event Driven Backbone"]
+        Kafka["Apache Kafka"]
+        Zookeeper["Zookeeper"]
+    end
+
+    subgraph Data_Layer["Data Persistence and Caching"]
+        Postgres["PostgreSQL (Primary DB)"]
+        Redis["Redis (L2 Cache & Session)"]
+        Elastic["Elasticsearch (Full Text Search)"]
+    end
+
+    %% Connections
+    Web -->|HTTPS REST| Nginx
+    Mobile -->|HTTPS REST| Nginx
+    Nginx -->|Reverse Proxy| Core
+
+    Core -->|Auth Provider| Auth
+    Core -->|Read & Write| Postgres
+    Core -->|Cache Operations| Redis
+    Core -->|Index & Search| Elastic
+    Core -->|Publish Events - User Actions| Kafka
+    Core -->|Synchronous HTTP Inference| ML
+
+    ML -->|Subscribe - Training Data Events| Kafka
+    ML -->|Fetch User History| Postgres
+    ML -->|Model Cache Access| Redis
+
+    Kafka -->|Async Model Updates| ML
+    Kafka -->|Push Notifications| Core
 ```
+
 
 ### Components
 
