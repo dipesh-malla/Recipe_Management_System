@@ -1,4 +1,5 @@
 # RecipeShare: Recipe Management System
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Spring Boot: 3.5.6](https://img.shields.io/badge/Spring%20Boot-3.5.6-6DB33F.svg)](https://spring.io/projects/spring-boot)
 [![Java: 17](https://img.shields.io/badge/Java-17-ED8B00.svg)](https://www.java.com/)
@@ -15,7 +16,7 @@ A comprehensive, full-stack application for managing recipes, featuring social i
 
 ---
 
-##  Project Demo
+## Project Demo
 
 https://github.com/user-attachments/assets/6ac87e6d-c648-4809-83de-4f2e7759c954
 
@@ -33,6 +34,7 @@ https://github.com/user-attachments/assets/6ac87e6d-c648-4809-83de-4f2e7759c954
   - [Backend Setup](#backend-setup)
   - [ML Backend Setup](#ml-backend-setup)
   - [Frontend Setup](#frontend-setup)
+- [Model Training](#model-training)
 - [API Documentation](#api-documentation)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
@@ -217,6 +219,83 @@ pnpm run dev
 ```
 
 - **App URL**: `http://localhost:5173` (or as configured in console)
+
+## 🧠 Model Training & AI Architecture
+
+The recommendation engine is the core of RecipeShare's personalized experience. We employ a hybrid approach combining **Collaborative Filtering** and **Deep Learning** to deliver accurate, diverse, and socially relevant recommendations.
+
+### 1. Alternating Least Squares (ALS)
+
+The **ALS** model serves as our primary collaborative filtering engine, optimized for implicit feedback datasets (views, likes, saves).
+
+- **Library:** `implicit` (GPU-accelerated)
+- **Technique:** Matrix Factorization with **BM25 weighting** to handle implicit interaction signals effectively.
+- **Hybrid Reranking Strategy:**
+  - **Social Boosting:** Recipes interacted with by a user's "followees" receive a relevance boost.
+  - **Content Similarity:** Cosine similarity between user profiles and recipe embeddings ensures content relevance.
+  - **Popularity Smoothing:** A weighted popularity score helps address the cold-start problem for new users.
+- **Hyperparameters:** `factors=128`, `regularization=0.05`, `iterations=30`, `alpha=40`.
+
+### 2. Two-Tower Neural Network
+
+For advanced retrieval and semantic matching, we utilize a **Two-Tower** deep learning architecture implemented in **PyTorch**.
+
+- **Architecture:**
+  - **User Tower:** Learns dense vector representations (embeddings) of user preferences.
+  - **Recipe Tower:** Learns dense vector representations of recipe features.
+  - **Interaction:** The dot product of these two vectors predicts the probability of user engagement.
+- **Training Configuration:**
+  - **Loss Function:** Weighted Binary Cross Entropy (BCE) to handle class imbalance (positive vs. negative interactions).
+  - **Optimizer:** Adam (`lr=1e-3`) with `ReduceLROnPlateau` scheduler for adaptive learning rates.
+  - **Batch Size:** 1024 (Optimized for T4 GPUs).
+  - **Early Stopping:** Monitors validation loss with a patience of 4 epochs to prevent overfitting.
+
+### 📊 Performance & Evaluation
+
+We rigorously evaluate our models using a **Train/Validation/Test (80/10/10)** split strategy to ensure generalization to unseen data.
+
+**Key Evaluation Metrics:**
+
+- **NDCG@K (Normalized Discounted Cumulative Gain):** The primary metric for ranking quality. It accounts for the position of relevant items in the recommendation list (higher is better).
+- **Precision@K:** Measures the percentage of recommended items that are relevant.
+- **Recall@K:** Measures the percentage of total relevant items that were successfully retrieved.
+- **MAP (Mean Average Precision):** Summarizes the precision-recall curve into a single score.
+- **MRR (Mean Reciprocal Rank):** Evaluates how high the first relevant item appears in the list.
+
+### 🧠 Advanced AI Features
+
+#### 1. Hybrid Reranking Engine
+
+Our system doesn't rely on a single algorithm. We employ a sophisticated weighted reranking formula to combine multiple signals:
+
+$$ Score*{final} = \alpha \cdot S*{ALS} + \beta \cdot S*{Social} + \gamma \cdot S*{Popularity} + \delta \cdot S\_{Content} $$
+
+- **$S_{ALS}$**: Collaborative filtering score (User preferences).
+- **$S_{Social}$**: Social influence score (What friends are cooking).
+- **$S_{Popularity}$**: Global trend score (Trending recipes).
+- **$S_{Content}$**: Semantic similarity score (Recipe ingredients/tags matching user history).
+
+#### 2. Cold-Start Handling
+
+New users without interaction history are seamlessly handled via a **Popularity-Based Fallback** mechanism, ensuring they receive high-quality trending recommendations immediately until sufficient personal data is collected.
+
+#### 3. Dataset Statistics
+
+The models are trained on a rich dataset representing diverse culinary interactions:
+
+- **Users:** ~5,000 unique profiles
+- **Recipes:** ~10,500 diverse recipes
+- **Interactions:** ~700,000+ user actions (likes, saves, views)
+- **Sparsity:** Optimized for high-sparsity environments typical of recommender systems.
+
+**Training Workflow:**
+The `Recipe_User_Recommendations.ipynb` notebook orchestrates the entire pipeline:
+
+1.  **Data Preprocessing:** Loading interactions and generating sparse matrices.
+2.  **Model Training:** Sequential training of ALS and Two-Tower models.
+3.  **Real-time Evaluation:** Computing metrics on the validation set after every epoch.
+4.  **Visualization:** Generating plots for Loss curves and Metric comparisons (Validation vs. Test).
+5.  **Artifact Management:** Saving trained models (`.pkl`, `.pth`) and results to Google Drive for deployment.
 
 ## 📡 API Documentation
 
