@@ -1,6 +1,5 @@
 package com.esewa.javabackend.module.AIML;
 
-
 import com.esewa.javabackend.enums.InteractionAction;
 import com.esewa.javabackend.enums.ResourceType;
 import com.esewa.javabackend.module.User;
@@ -41,8 +40,7 @@ public class Interaction {
     @CreationTimestamp
     private Instant createdAt;
 
-
-    private boolean isNew = true;
+    @Column(name = "is_new", nullable = false)
+    @Builder.Default
+    private Boolean isNew = false;
 }
-
-

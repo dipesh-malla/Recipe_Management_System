@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Edit, Trash2, PlusCircle, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getCurrentUser, getUserById, getUserRecipes, getFollowers, getFollowing, deleteRecipe } from '@/lib/api';
+import SavedRecipes from '@/components/SavedRecipes';
 import { useToast } from '@/hooks/use-toast';
 
 interface Recipe {
@@ -366,7 +367,7 @@ export default function UserProfile() {
   };
 
   // Controlled tab so we can react to changes and load lists when user switches tabs
-  const [activeTab, setActiveTab] = useState<'created' | 'followers' | 'following'>('created');
+  const [activeTab, setActiveTab] = useState<'created' | 'followers' | 'following' | 'saved'>('created');
 
   // Explicit handlers with logging so we can verify clicks in the console
   const handleShowFollowers = () => {
@@ -425,7 +426,7 @@ export default function UserProfile() {
       </header>
 
       <div className="w-full">
-        <div role="tablist" className="grid w-full grid-cols-3 bg-gray-100 rounded-lg p-1">
+        <div role="tablist" className="grid w-full grid-cols-4 bg-gray-100 rounded-lg p-1">
             <button
             role="tab"
             aria-selected={activeTab === 'created' ? 'true' : 'false'}
@@ -451,6 +452,15 @@ export default function UserProfile() {
             onClick={() => { setActiveTab('following'); fetchFollowingData(); }}
           >
             Following ({displayStats.followingCount})
+          </button>
+
+          <button
+            role="tab"
+            aria-selected={activeTab === 'saved' ? 'true' : 'false'}
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus:outline-none ${activeTab === 'saved' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'}`}
+            onClick={() => setActiveTab('saved')}
+          >
+            Saved
           </button>
         </div>
 
@@ -487,7 +497,13 @@ export default function UserProfile() {
               )}
             </div>
           )}
+          }
 
+          {activeTab === 'saved' && (
+            <div>
+              <SavedRecipes userId={user.id} />
+            </div>
+          )}
           {activeTab === 'followers' && (
             <div>
               {loadingFollowers ? (

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import SavedRecipes from './SavedRecipes';
 import { User, UserPlus, UserCheck, Loader2, Edit, Trash2, PlusCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getUserById, getUserRecipes, followUser, unfollowUser, isFollowing, getUserStatByUserId } from '@/lib/api';
@@ -396,8 +397,9 @@ export default function PublicUserProfile({ userId }: { userId?: number }) {
 
       {/* Recipes Section */}
       <Tabs defaultValue="recipes" className="w-full">
-        <TabsList className="grid w-full grid-cols-1 max-w-md mx-auto">
+        <TabsList className={`grid w-full ${isOwnProfile ? 'grid-cols-2' : 'grid-cols-1'} max-w-md mx-auto`}>
           <TabsTrigger value="recipes">Recipes ({recipes.length})</TabsTrigger>
+          {isOwnProfile && <TabsTrigger value="saved">Saved</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="recipes" className="mt-6">
@@ -420,6 +422,11 @@ export default function PublicUserProfile({ userId }: { userId?: number }) {
             </div>
           )}
         </TabsContent>
+        {isOwnProfile && (
+          <TabsContent value="saved" className="mt-6">
+            <SavedRecipes userId={userId} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
