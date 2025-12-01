@@ -1,6 +1,18 @@
 # RecipeShare: Recipe Management System
 
+
 A comprehensive, full-stack application for managing recipes, featuring social interactions and personalized AI-powered recommendations.
+
+## 🎥 Demo
+
+<div align="center">
+    <video width="100%" controls>
+        <source src="assets/Recipe_MS%20-%20Made%20with%20Clipchamp%20(1).mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    <br>
+    <em>Watch the demo above or <a href="assets/Recipe_MS%20-%20Made%20with%20Clipchamp%20(1).mp4">download the video</a>.</em>
+</div>
 
 ## 📋 Table of Contents
 
@@ -75,7 +87,6 @@ graph TD
     Kafka -->|Async Model Updates| ML
     Kafka -->|Push Notifications| Core
 ```
-
 
 ### Components
 
