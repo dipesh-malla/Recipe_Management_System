@@ -20,6 +20,7 @@ public interface PostMapper {
     @Mapping(source = "author.username", target = "author.username")
     @Mapping(source = "author.displayName", target = "author.displayName")
     @Mapping(source = "author.profile.url", target = "author.profileUrl")
+    @Mapping(source = "new" , target = "isNew")
     PostResponseDTO toResponseDTO(Post post);
 
     @Mapping(source = "authorId", target = "author.id")
@@ -29,5 +30,6 @@ public interface PostMapper {
     @Mapping(target = "id", ignore = true)
     void updatePostFromDTO(PostDTO postDTO, @MappingTarget Post post);
 
+    @Mapping(source = "new" , target = "isNew")
     PostDTO toDTO(Post post);
 }
