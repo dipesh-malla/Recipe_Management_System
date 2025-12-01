@@ -24,7 +24,7 @@ https://github.com/user-attachments/assets/6ac87e6d-c648-4809-83de-4f2e7759c954
 
 ## 📋 Table of Contents
 
-- [Overview](#overview)
+- [Overview](##overview)
 - [System Architecture](#system-architecture)
 - [Key Features](#key-features)
 - [Tech Stack](#tech-stack)
@@ -219,6 +219,8 @@ pnpm run dev
 ```
 
 - **App URL**: `http://localhost:5173` (or as configured in console)
+
+---
 
 ## 🧠 Model Training & AI Architecture
 
