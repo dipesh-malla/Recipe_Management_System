@@ -54,4 +54,7 @@ public class Post extends AuditingEntity {
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private Set<Reaction> reactions = new HashSet<>();
+
+
+    private boolean isNew = true;
 }

@@ -5,30 +5,27 @@ import com.esewa.javabackend.dto.Base.GlobalApiResponse;
 import com.esewa.javabackend.dto.CommentDTO;
 import com.esewa.javabackend.dto.ReactionDTO;
 import com.esewa.javabackend.dto.RecipeCommentDTO;
+import com.esewa.javabackend.dto.RecipeReactionDTO;
 import com.esewa.javabackend.enums.Messages;
-import com.esewa.javabackend.mapper.RecipeCommentMapper;
-import com.esewa.javabackend.module.Message;
 import com.esewa.javabackend.service.CommentReactionService;
-import com.esewa.javabackend.service.RecipeCommentService;
+import com.esewa.javabackend.service.RecipeCommentReactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RequestMapping("/api/posts")
+@RequestMapping("/api")
 @RestController
 @RequiredArgsConstructor
 public class CommentReactionController extends BaseController {
     private final CommentReactionService commentReactionService;
-    private final RecipeCommentService  recipeCommentService;
+    private final RecipeCommentReactionService recipeCommentReactionService;
 
-    @PostMapping("/{postId}/comments")
-    public ResponseEntity<GlobalApiResponse<CommentDTO>> addComment(
-            @PathVariable Integer postId,
+    @PostMapping("/post/comments")
+    public ResponseEntity<GlobalApiResponse<CommentDTO>> addPostComment(
             @RequestBody CommentDTO commentDTO) {
 
-        commentDTO.setPostId(postId);
 
         return ResponseEntity.ok(successResponse(
                 commentReactionService.addComment(commentDTO),
@@ -37,7 +34,7 @@ public class CommentReactionController extends BaseController {
         ));
     }
 
-    @GetMapping("/post/{postId}")
+    @GetMapping("/post/comments/{postId}")
     public ResponseEntity<GlobalApiResponse<List<CommentDTO>>> getCommentsByPost(
             @PathVariable Integer postId
     ) {
@@ -48,12 +45,11 @@ public class CommentReactionController extends BaseController {
 
 
 
-    @PostMapping("/{postId}/reactions")
-    public ResponseEntity<GlobalApiResponse<ReactionDTO>> addReaction(
-            @PathVariable Integer postId,
+    @PostMapping("/post/reactions")
+    public ResponseEntity<GlobalApiResponse<ReactionDTO>> addPostReaction(
             @RequestBody ReactionDTO reactionDTO
     ){
-        reactionDTO.setPostId(postId);
+        reactionDTO.setPostId(reactionDTO.getPostId());
         return ResponseEntity.ok(successResponse(
                 commentReactionService.addReaction(reactionDTO),
                 Messages.SUCCESS,
@@ -63,21 +59,63 @@ public class CommentReactionController extends BaseController {
 
     }
 
+    @GetMapping("/post/reactions/{postId}")
+    public ResponseEntity<GlobalApiResponse<List<ReactionDTO>>> getReactionsByPost(
+            @PathVariable Integer postId
+    ){
+        return ResponseEntity.ok(successResponse(
+                commentReactionService.getReactionByPost(postId),
+                Messages.SUCCESS,
+                "Reactions by post"
+        ));
+    }
 
-//    @PostMapping("/{recipeId}/reactions")
-//    public ResponseEntity<GlobalApiResponse<ReactionDTO>> addRecipeReaction(
-//            @PathVariable Integer recipeId,
-//            @RequestBody RecipeCommentDTO reactionDTO
-//    ){
-//        reactionDTO.setPostId(postId);
-//        return ResponseEntity.ok(successResponse(
-//                commentReactionService.addReaction(reactionDTO),
-//                Messages.SUCCESS,
-//                "Reaction added successfully"
-//
-//        ));
-//
-//    }
+
+
+
+// recipe reaction and comment apis
+@PostMapping("/recipe/comments")
+public ResponseEntity<GlobalApiResponse<?>> addRecipeComment(@RequestBody RecipeCommentDTO recipeCommentDTO) {
+
+    return ResponseEntity.ok(successResponse(
+            recipeCommentReactionService.addComment(recipeCommentDTO),
+            Messages.SUCCESS,
+            "Comment added"
+    ));
+}
+
+    @GetMapping("recipe/comment/{recipeId}")
+    public ResponseEntity<GlobalApiResponse<?>> getRecipeCommentById(@PathVariable Integer recipeId) {
+        return ResponseEntity.ok(
+                successResponse(
+                        recipeCommentReactionService.getCommentsByRecipe(recipeId),
+                        Messages.SUCCESS,
+                        "Comment fetched"
+                )
+        );
+    }
+
+//    @PostMapping("/recipe/{recipeId}")
+@PostMapping("/recipe/reactions")
+public ResponseEntity<GlobalApiResponse<?>> addRecipeReaction(@RequestBody RecipeReactionDTO recipeReacitonDTO) {
+
+    return ResponseEntity.ok(successResponse(
+            recipeCommentReactionService.addReaction(recipeReacitonDTO),
+            Messages.SUCCESS,
+            "Comment added"
+    ));
+}
+
+    @GetMapping("recipe/reaction/{recipeId}")
+    public ResponseEntity<GlobalApiResponse<?>> getRecipeReactionsById(@PathVariable Integer recipeId) {
+        return ResponseEntity.ok(
+                successResponse(
+                        recipeCommentReactionService.getReactionsByRecipe(recipeId),
+                        Messages.SUCCESS,
+                        "Comment fetched"
+                )
+        );
+    }
 
 
 }

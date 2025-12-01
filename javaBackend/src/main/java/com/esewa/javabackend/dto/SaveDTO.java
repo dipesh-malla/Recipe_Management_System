@@ -1,6 +1,5 @@
-package com.esewa.javabackend.dto.event;
+package com.esewa.javabackend.dto;
 
-import com.esewa.javabackend.enums.InteractionAction;
 import com.esewa.javabackend.enums.ResourceType;
 import lombok.*;
 
@@ -9,11 +8,10 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class InteractionEvent {
+public class SaveDTO {
+    private Integer id;
     private Integer userId;
     private ResourceType resourceType;
     private Integer resourceId;
-    private InteractionAction action;
-    private Double value;
-    private boolean isNew;
+    private String shareText;
 }

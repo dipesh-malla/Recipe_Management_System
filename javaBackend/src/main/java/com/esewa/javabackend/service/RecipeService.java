@@ -148,6 +148,7 @@ public class RecipeService {
         recipe.setDietaryType(recipeDTO.getDietaryType());
         recipe.setPublic(recipeDTO.isPublic());
         recipe.setServings(recipeDTO.getServings());
+        recipe.setNew(true);
 
         Recipe savedRecipe = recipeRepository.save(recipe);
         if (recipeDTO.getInstructions() != null) {

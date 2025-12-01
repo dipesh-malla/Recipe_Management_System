@@ -78,6 +78,7 @@ public class PostService {
                             messageSource.getMessage("not.found", "User"))));
         }
 
+
         // Update post fields
         postMapper.updatePostFromDTO(postDTO, post);
 
