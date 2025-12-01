@@ -1,20 +1,36 @@
 import { useState, useEffect } from "react";
-import { getCurrentUser, getAllSavedItems, unsaveResource } from "@/lib/api";
+import { getCurrentUser, getAllSavedItems, unsaveResource, getRecipeById } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { SavedItem, Recipe } from "@shared/api";
 
-export default function SavedRecipes() {
+export default function SavedRecipes({ userId: propUserId }: { userId?: number } = {}) {
     const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
     const [error, setError] = useState<string | null>(null);
     const currentUser = getCurrentUser();
 
     const fetchSavedItems = async () => {
-        if (!currentUser) return;
+        const userIdToUse = propUserId ?? currentUser?.id;
+        if (!userIdToUse) return;
         try {
-            const response = await getAllSavedItems(currentUser.id);
-            setSavedItems(response.data);
+            const response = await getAllSavedItems(userIdToUse);
+            const items: SavedItem[] = response?.data ?? [];
+
+            // For saved recipes, fetch recipe details so UI can show title/media
+            const enhanced = await Promise.all(items.map(async (it) => {
+                if (it.resourceType === 'RECIPE' && it.resourceId) {
+                    try {
+                        const r = await getRecipeById(it.resourceId);
+                        it.resource = r?.data ?? r ?? it.resource;
+                    } catch (e) {
+                        // ignore and leave resource undefined
+                    }
+                }
+                return it;
+            }));
+
+            setSavedItems(enhanced);
         } catch (err: any) {
             setError("Failed to fetch your saved recipes.");
         }
@@ -22,7 +38,7 @@ export default function SavedRecipes() {
 
     useEffect(() => {
         fetchSavedItems();
-    }, [currentUser]);
+    }, [currentUser, propUserId]);
 
     const handleUnsave = async (saveId: number) => {
         if (!confirm("Are you sure you want to unsave this item?")) return;
@@ -36,8 +52,31 @@ export default function SavedRecipes() {
 
     // Filter for saved recipes and use a type guard for type safety
     const savedRecipes = savedItems.filter(
-        (item): item is SavedItem & { resource: Partial<Recipe> } => item.resourceType === 'RECIPE'
+        (item): item is SavedItem & { resource?: Partial<Recipe> } => item.resourceType === 'RECIPE'
     );
+
+    const resolveImage = (resource?: Partial<Recipe>, resourceId?: number) => {
+        if (!resource) return `https://placehold.co/400x300/e2e8f0/64748b?text=${encodeURIComponent('No Image')}`;
+        // Common fields used by different endpoints
+        const candidates = [
+            // normalized by getRecipeById mapping
+            (resource as any).image,
+            (resource as any).imageUrl,
+            // some endpoints use media: [{ url }]
+            Array.isArray((resource as any).media) && (resource as any).media[0]?.url,
+            // older shapes
+            Array.isArray((resource as any).images) && (resource as any).images[0]?.url,
+            // fallback to author-provided placeholder
+            (resource as any).thumbnail || (resource as any).img || null,
+        ];
+        for (const c of candidates) {
+            if (typeof c === 'string' && c.trim()) return c;
+        }
+        // finally try a generated placeholder using id
+        return `https://placehold.co/400x300/e2e8f0/64748b?text=${encodeURIComponent(String(resource?.title || `Recipe ${resourceId || ''}`))}`;
+    };
+
+    const PLACEHOLDER = `https://placehold.co/400x300/e2e8f0/64748b?text=${encodeURIComponent('No Image')}`;
 
     return (
         <div className="mt-6">
@@ -47,17 +86,19 @@ export default function SavedRecipes() {
                 {savedRecipes.map(item => (
                     <Card key={item.id} className="overflow-hidden">
                          <Link to={`/recipes/${item.resourceId}`}>
-                            <img 
-                                src={item.resource?.media?.[0]?.url || 'https://via.placeholder.com/300'} 
-                                alt={item.resource?.title || "Saved recipe"} 
-                                className="w-full h-48 object-cover" 
+                            <img
+                                src={resolveImage(item.resource, item.resourceId)}
+                                alt={item.resource?.title || "Saved recipe"}
+                                className="w-full h-48 object-cover"
+                                loading="lazy"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).src = PLACEHOLDER; }}
                             />
                         </Link>
                         <div className="p-4">
-                            <h3 className="font-bold text-lg hover:underline">
-                                 <Link to={`/recipes/${item.resourceId}`}>{item.resource?.title || "Untitled Recipe"}</Link>
-                            </h3>
-                             <p className="text-sm text-gray-500">Saved on {new Date(item.createdDate).toLocaleDateString()}</p>
+                               <h3 className="font-bold text-lg hover:underline">
+                                   <Link to={`/recipes/${item.resourceId}`}>{item.resource?.title || `Recipe ${item.resourceId}` || "Untitled Recipe"}</Link>
+                               </h3>
+                                <p className="text-sm text-gray-500">Saved on {new Date(item.createdAt || (item.createdAT as any) || item.createdDate || Date.now()).toLocaleDateString()}</p>
                             <div className="flex justify-end mt-4">
                                 <Button variant="secondary" size="sm" onClick={() => handleUnsave(item.id)}>
                                     Unsave
