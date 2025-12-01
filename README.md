@@ -1,6 +1,25 @@
 # RecipeShare: Recipe Management System
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Spring Boot: 3.5.6](https://img.shields.io/badge/Spring%20Boot-3.5.6-6DB33F.svg)](https://spring.io/projects/spring-boot)
+[![Java: 17](https://img.shields.io/badge/Java-17-ED8B00.svg)](https://www.java.com/)
+[![FastAPI: 0.109.0](https://img.shields.io/badge/FastAPI-0.109.0-009688.svg)](https://fastapi.tiangolo.com/)
+[![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg)](https://www.python.org/)
+[![React: 18](https://img.shields.io/badge/React-18-61DAFB.svg)](https://reactjs.org/)
+[![TypeScript: 5.0](https://img.shields.io/badge/TypeScript-5.0-3178C6.svg)](https://www.typescriptlang.org/)
+[![PostgreSQL: 15](https://img.shields.io/badge/PostgreSQL-15-336791.svg)](https://www.postgresql.org/)
+[![Docker: 24.0](https://img.shields.io/badge/Docker-24.0-2496ED.svg)](https://www.docker.com/)
+[![PyTorch: 2.0](https://img.shields.io/badge/PyTorch-2.0-EE4C2C.svg)](https://pytorch.org/)
+[![Kafka: 3.5](https://img.shields.io/badge/Kafka-3.5-231F20.svg)](https://kafka.apache.org/)
 
 A comprehensive, full-stack application for managing recipes, featuring social interactions and personalized AI-powered recommendations.
+
+---
+
+##  Project Demo
+
+https://github.com/user-attachments/assets/6ac87e6d-c648-4809-83de-4f2e7759c954
+
+---
 
 ## 📋 Table of Contents
 
