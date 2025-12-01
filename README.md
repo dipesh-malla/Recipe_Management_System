@@ -1,549 +1,214 @@
-# RecipeShare - Recipe Management System
+# RecipeShare: Recipe Management System
 
-> **Full-Stack Application**  
-> Frontend (React) ↔️ Backend (Spring Boot & FastAPI) ↔️ Database (PostgreSQL)
+A comprehensive, full-stack application for managing recipes, featuring social interactions and personalized AI-powered recommendations.
 
----
+## 📋 Table of Contents
 
-## 🚀 Quick Start (Docker-first)
+- [Overview](#overview)
+- [System Architecture](#system-architecture)
+- [Key Features](#key-features)
+- [Tech Stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Getting Started](#getting-started)
+  - [Infrastructure Setup](#infrastructure-setup)
+  - [Backend Setup](#backend-setup)
+  - [ML Backend Setup](#ml-backend-setup)
+  - [Frontend Setup](#frontend-setup)
+- [API Documentation](#api-documentation)
+- [Project Structure](#project-structure)
+- [Contributing](#contributing)
 
-This project is optimized for local development with Docker Compose. The repository contains a root `docker-compose.yml` that brings up the primary services (Postgres, Kafka, Redis, Elasticsearch and dev mail). For ML development there is a focused compose at `ML_Backend/docker-compose.yml` (ml-backend + Redis + Kafka).
+## 🔭 Overview
 
-Prerequisites
+The **Recipe Management System** is a modern web application designed to transform how users discover and share culinary experiences. It integrates a robust **Java Spring Boot** backend for core business logic, a **Python FastAPI** service for machine learning-based personalized recommendations, and a responsive **React** frontend for an engaging user experience.
 
-- Docker (20.x+) and Docker Compose (v2) installed
-- Recommended: 8+ GB RAM available for local stack
+## 🏗 System Architecture
 
-Start the full stack (recommended)
+The system follows a microservices-inspired architecture, ensuring scalability and separation of concerns.
+
+```mermaid
+graph TD
+    Client[React Frontend] -->|HTTP/REST| Java[Java Backend]
+    Java -->|JDBC| DB[(PostgreSQL)]
+    Java -->|Kafka| Kafka{Kafka}
+    Java -->|HTTP| ML[ML Backend]
+    ML -->|Read| DB
+    ML -->|Subscribe| Kafka
+    ML -->|Cache| Redis[(Redis)]
+    Java -->|Search| ES[(Elasticsearch)]
+```
+
+### Components
+
+- **Frontend (React)**: The user interface for browsing recipes, managing profiles, and interacting with the community.
+- **Java Backend (Spring Boot)**: The core application server handling user authentication, recipe CRUD operations, social features, and orchestration.
+- **ML Backend (FastAPI)**: A dedicated service that generates personalized recipe recommendations using advanced ML models (Two-Tower Neural Network + ALS).
+- **PostgreSQL**: The primary relational database for storing user data, recipes, and interactions.
+- **Apache Kafka**: Handles asynchronous event streaming (e.g., user clicks, likes) to trigger model updates and notifications.
+- **Redis**: High-performance caching layer for session management and recommendation caching.
+- **Elasticsearch**: Powers advanced search capabilities for recipes and ingredients.
+
+## ✨ Key Features
+
+- **User Management**: Secure registration, authentication, and detailed user profiles.
+- **Recipe Management**: Create, edit, and delete recipes with support for rich media (images/videos).
+- **Social Interactions**: Follow other chefs, like recipes, and comment on posts.
+- **Smart Recommendations**: Personalized recipe feeds tailored to user preferences and behavior.
+- **Advanced Search**: Find recipes by ingredients, tags, cooking time, or name.
+- **Activity Feed**: Stay updated with the latest creations from users you follow.
+
+## 🛠 Tech Stack
+
+### Frontend
+
+- **Framework**: React (Vite)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS, Radix UI
+- **State Management**: React Query / Context API
+
+### Backend (Core)
+
+- **Framework**: Spring Boot 3.5.6
+- **Language**: Java 17
+- **Database**: PostgreSQL
+- **Search**: Elasticsearch
+- **Messaging**: Apache Kafka
+- **Caching**: Redis
+- **Build Tool**: Maven
+
+### ML Backend
+
+- **Framework**: FastAPI
+- **Language**: Python 3.10+
+- **ML Libraries**: PyTorch, Scikit-learn, Implicit, Pandas, NumPy
+- **Models**: Two-Tower Neural Network, Alternating Least Squares (ALS)
+- **Build Tool**: Pip
+
+## 📦 Prerequisites
+
+Ensure you have the following installed:
+
+- **Docker** & **Docker Compose** (Recommended for infrastructure)
+- **Java 17** (For running the Java Backend)
+- **Node.js 18+** & **pnpm** (For running the Frontend)
+- **Python 3.10+** (For running the ML Backend)
+
+## 🚀 Getting Started
+
+### 1. Infrastructure Setup
+
+Start the required infrastructure services (Postgres, Kafka, Redis, Elasticsearch) using Docker Compose.
 
 ```bash
-# From the repository root
-docker compose up -d --build
-
-# Tail logs (optional)
-docker compose logs -f
+# From the project root
+docker-compose up -d
 ```
 
-Start only the ML stack (ml-backend + Redis + Kafka) for ML development:
+_Note: This starts the infrastructure containers only. The application services must be run separately._
 
-```bash
-docker compose -f ML_Backend/docker-compose.yml up --build -d
-docker compose -f ML_Backend/docker-compose.yml logs -f ml-backend
-```
+### 2. Backend Setup (Java)
 
-Stop and remove containers
-
-```bash
-docker compose down --volumes
-```
-
-Notes
-
-- The root compose starts services on these default ports: Postgres `5432`, Kafka `9092`, Elasticsearch `9200`, Redis `6380` (host), Frontend/Backend ports are configured by service images and environment variables.
-- If you prefer running services locally without Docker, see the Development section lower in this document.
-
----
-
-## 🌐 Access Your Application
-
-Once started, access these URLs:
-
-| Service             | URL                                 | Description      |
-| ------------------- | ----------------------------------- | ---------------- |
-| **Web Application** | http://localhost:8080               | Main frontend    |
-| **System Status**   | http://localhost:8080/system-status | Health dashboard |
-| **Backend API**     | http://localhost:8090/api           | REST API         |
-| **Health Check**    | http://localhost:8090/api/health    | Backend status   |
-
----
-
-## 🐳 Docker — Build & run specific services
-
-You can build and run the frontend/backend artifacts as Docker images if you want to reproduce production packaging locally.
-
-Build backend image (from `javaBackend`):
-
-```bash
-cd javaBackend
-./mvnw -DskipTests clean package
-docker build -t recipes-java-backend:local .
-```
-
-Build frontend image (from `Recipe_frontend/recipe_frontend`):
-
-```bash
-cd Recipe_frontend/recipe_frontend
-pnpm install
-pnpm run build
-docker build -t recipes-frontend:local .
-```
-
-Run the images with Docker Compose by referencing overrides or by editing the root `docker-compose.yml` to use the built `image:` names.
-
-Healthchecks & logs
-
-- Inspect running containers: `docker ps`
-- View logs for a container: `docker logs -f <container-name>`
-- Check service health endpoints (backend: `/api/health`, ML: `/api/health`)
-
-## 📚 Documentation
-
-We've created comprehensive documentation for you:
-
-### **Primary Documents**
-
-1. **[INTEGRATION-SUMMARY.md](./INTEGRATION-SUMMARY.md)**  
-   📖 Complete overview and executive summary
-
-2. **[README-INTEGRATION.md](./README-INTEGRATION.md)**  
-   📘 Detailed integration guide with all API endpoints
-
-3. **[SETUP-COMPLETE.md](./SETUP-COMPLETE.md)**  
-   🔧 Setup verification and troubleshooting
-
-4. **[INTEGRATION-CHECKLIST.md](./INTEGRATION-CHECKLIST.md)**  
-   ✅ Verification checklist and testing guide
-
-5. **[VISUAL-GUIDE.md](./VISUAL-GUIDE.md)**  
-   📊 Architecture diagrams and visual flows
-
-6. **[QUICK-REFERENCE.txt](./QUICK-REFERENCE.txt)**  
-   ⚡ Quick reference card (print-friendly)
-
-### **Where to Start**
-
-- **New User?** → Start with `INTEGRATION-SUMMARY.md`
-- **Want Details?** → Read `README-INTEGRATION.md`
-- **Having Issues?** → Check `SETUP-COMPLETE.md`
-- **Quick Lookup?** → Use `QUICK-REFERENCE.txt`
-
----
-
-## ✅ What Was Done
-
-### Backend (Java/Spring Boot)
-
-- ✨ Added CORS configuration (`CorsConfig.java`)
-- ✨ Created health check endpoints
-- ✨ Configured to accept frontend requests
-- ✨ All REST controllers properly exposed
-
-### Frontend (React/Vite)
-
-- ✨ Environment variables configured
-- ✨ API client updated with env vars
-- ✨ System Status page added
-- ✨ Debug logging enabled
-- ✨ Routes properly configured
-
-### Integration
-
-- ✨ Frontend can call backend APIs
-- ✨ CORS errors resolved
-- ✨ Authentication flow working
-- ✨ File uploads supported
-- ✨ Error handling implemented
-
-### Automation
-
-- ✨ `start-dev.ps1` - Comprehensive startup
-- ✨ `quick-start.ps1` - Fast startup
-- ✨ `quick-start.bat` - Windows batch version
-- ✨ `test-backend.ps1` - Backend testing
-- ✨ Automatic browser opening
-
----
-
-## 🎯 Verification
-
-### Quick Test
-
-1. **Start the system:**
-
-   ```powershell
-   .\quick-start.ps1
-   ```
-
-2. **Check System Status:**
-
-   - Open: http://localhost:8080/system-status
-   - All services should show green checkmarks
-
-3. **Test Backend:**
-
-   ```powershell
-   .\test-backend.ps1
-   ```
-
-4. **Use the Application:**
-   - Register a new user
-   - Create a recipe
-   - Upload images
-   - View the feed
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────┐
-│   Browser   │  http://localhost:8080
-└──────┬──────┘
-       │ REST API
-       ▼
-┌─────────────┐
-│   React     │  Frontend (Vite)
-│  Frontend   │  • Pages, Components
-│             │  • API Client
-└──────┬──────┘
-       │ HTTP/JSON
-       ▼
-┌─────────────┐
-│   Spring    │  http://localhost:8090/api
-│   Boot      │  • Controllers
-│  Backend    │  • Services
-│             │  • CORS Config
-└──────┬──────┘
-       │ JDBC/JPA
-       ▼
-┌─────────────┐
-│ PostgreSQL  │  postgresql://localhost:5432
-│  Database   │  recipe_sh82
-└─────────────┘
-```
-
----
-
-## 🔍 Key Features
-
-### For Users
-
-- 👤 User registration and authentication
-- 📝 Create and share recipes
-- 📸 Upload images and videos
-- 💬 Comment and react
-- 👥 Follow other users
-- 🔔 Receive notifications
-- 💌 Send messages
-
-### For Developers
-
-- 🔧 One-command startup
-- 📊 Real-time health monitoring
-- 🔍 Debug logging
-- 🔄 Hot reload enabled
-- 📚 Comprehensive documentation
-- ✅ Testing scripts
-- 🎯 Clear error messages
-
----
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Backend Won't Start**
-
-- Check if PostgreSQL is running
-- Verify port 8090 is available
-- Check database credentials
-
-**Frontend Can't Connect**
-
-- Ensure backend is running first
-- Check browser console (F12)
-- Verify CORS configuration
-
-**Port Conflicts**
-
-```powershell
-# Find process using port
-netstat -ano | findstr :8090
-
-# Kill process
-taskkill /PID <PID> /F
-```
-
-**For detailed troubleshooting:** See `SETUP-COMPLETE.md`
-
----
-
-## 📊 API Endpoints
-
-### Authentication
-
-```
-POST /api/auth/register
-POST /api/auth/login
-```
-
-### Users
-
-```
-GET    /api/v1/users
-GET    /api/v1/users/{id}
-PUT    /api/v1/users/update
-DELETE /api/v1/users/{id}
-```
-
-### Recipes
-
-```
-GET    /api/v1/recipes/allRecipe
-POST   /api/v1/recipes
-GET    /api/v1/recipes/find/{id}
-DELETE /api/v1/recipes/delete/{id}
-```
-
-### Posts
-
-```
-GET    /api/posts
-POST   /api/posts
-GET    /api/posts/{id}
-DELETE /api/posts/delete?id={id}
-```
-
-**For complete API list:** See `README-INTEGRATION.md`
-
----
-
-## 🎓 Development Workflow (recommended)
-
-We recommend using Docker Compose for an environment that closely matches production. For fast frontend/back development you can run only the services you need.
-
-1. Start the full stack (recommended):
-
-```bash
-docker compose up -d --build
-```
-
-2. Frontend hot-reload (if developing UI only):
-
-```bash
-cd Recipe_frontend/recipe_frontend
-pnpm install
-pnpm run dev
-```
-
-3. Backend development (Spring Boot):
+Navigate to the `javaBackend` directory and start the Spring Boot application.
 
 ```bash
 cd javaBackend
+# Run using Maven wrapper
 ./mvnw spring-boot:run
 ```
 
-4. Test and iterate
+- **Server Port**: `8090`
+- **API Base URL**: `http://localhost:8090/api`
 
-- Use Postman or curl to exercise APIs
-- Check logs via `docker compose logs -f` or `./mvnw spring-boot:run` terminal
+### 3. ML Backend Setup (Python)
 
-5. Commit and push changes
+Navigate to the `ML_Backend` directory and start the FastAPI service.
 
 ```bash
-git add .
-git commit -m "Short description"
-git push
+cd ML_Backend
+
+# Create a virtual environment
+python -m venv env
+
+# Activate the environment
+# Windows:
+.\env\Scripts\activate
+# Linux/Mac:
+source env/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+uvicorn api.main:app --reload --port 8000
 ```
 
----
+- **Server Port**: `8000`
+- **API Base URL**: `http://localhost:8000`
 
-## 🚢 Production Deployment
+### 4. Frontend Setup (React)
 
-### Environment Configuration
+Navigate to the `Recipe_frontend/recipe_frontend` directory and start the development server.
 
-1. **Update `.env.production`:**
+```bash
+cd Recipe_frontend/recipe_frontend
 
-   ```env
-   VITE_JAVA_API_URL=https://api.yourdomain.com/api
-   VITE_ML_API_URL=https://ml-api.yourdomain.com/api
-   ```
+# Install dependencies
+pnpm install
 
-2. **Build Frontend:**
+# Start development server
+pnpm run dev
+```
 
-   ```bash
-   cd Recipe_frontend/recipe_frontend
-   pnpm run build
-   ```
+- **App URL**: `http://localhost:5173` (or as configured in console)
 
-3. **Package Backend:**
+## 📡 API Documentation
 
-   ```bash
-   cd javaBackend
-   ./mvnw clean package
-   ```
+### Java Backend Endpoints
 
-4. **Deploy:**
-   - Frontend: Deploy `dist/` folder to CDN/hosting
-   - Backend: Deploy JAR file to server
-   - Database: Set up production PostgreSQL
+- `POST /api/auth/register` - Register a new user
+- `POST /api/auth/login` - User login
+- `GET /api/v1/recipes` - Get all recipes
+- `POST /api/v1/recipes` - Create a new recipe
+- `GET /api/v1/users/{id}` - Get user profile
 
----
+### ML Backend Endpoints
 
-## 📞 Support
+- `POST /api/recommendations` - Get personalized recommendations
+- `GET /api/health` - Check service health
 
-### If You Need Help
+_For detailed API documentation, refer to the Swagger UI at `http://localhost:8090/swagger-ui.html` (when backend is running)._
 
-1. Check documentation in order:
-
-   - `INTEGRATION-SUMMARY.md` (overview)
-   - `SETUP-COMPLETE.md` (troubleshooting)
-   - `README-INTEGRATION.md` (detailed guide)
-
-2. Verify setup:
-
-   - Run `.\test-backend.ps1`
-   - Check System Status page
-   - Review logs in terminals
-
-3. Common solutions:
-   - Restart services
-   - Clear browser cache
-   - Check database connection
-   - Verify ports are available
-
----
-
-## 🎉 Success Indicators
-
-Your system is working correctly if:
-
-- ✅ Backend starts without errors
-- ✅ Frontend connects to backend
-- ✅ System Status shows all green
-- ✅ Can register and login users
-- ✅ Can create recipes with images
-- ✅ No CORS errors in console
-
----
-
-## 📝 File Structure
+## 📂 Project Structure
 
 ```
 Recipe_Management_System/
-├── 📄 README.md                      ← YOU ARE HERE
-├── 📄 INTEGRATION-SUMMARY.md         ← Overview
-├── 📄 README-INTEGRATION.md          ← Detailed guide
-├── 📄 SETUP-COMPLETE.md              ← Troubleshooting
-├── 📄 INTEGRATION-CHECKLIST.md       ← Verification
-├── 📄 VISUAL-GUIDE.md                ← Diagrams
-├── 📄 QUICK-REFERENCE.txt            ← Quick reference
-│
-├── ⚙️ start-dev.ps1                  ← Full startup
-├── ⚙️ quick-start.ps1                ← Fast startup
-├── ⚙️ quick-start.bat                ← Batch version
-├── ⚙️ test-backend.ps1               ← Backend test
-│
-├── 📁 javaBackend/                   ← Spring Boot
-│   └── src/main/
-│       ├── java/.../config/
-│       │   └── CorsConfig.java       ✨ NEW
-│       └── resources/
-│           └── application.yml
-│
-└── 📁 Recipe_frontend/               ← React
-    └── recipe_frontend/
-        ├── .env.development          ✨ NEW
-        ├── .env.production           ✨ NEW
-        └── client/
-            ├── lib/api.ts            ✏️ MODIFIED
-            └── pages/
-                └── SystemStatus.tsx  ✨ NEW
+├── docker-compose.yml      # Infrastructure orchestration (DB, Kafka, Redis)
+├── docs/                   # Project documentation
+├── javaBackend/            # Spring Boot Application (Core Logic)
+│   ├── src/                # Source code
+│   ├── pom.xml             # Maven configuration
+│   └── compose.yaml        # Backend-specific docker compose
+├── ML_Backend/             # Python FastAPI Service (AI/ML)
+│   ├── api/                # API routes and logic
+│   ├── models/             # ML models
+│   ├── notebooks/          # Jupyter notebooks for training
+│   └── requirements.txt    # Python dependencies
+└── Recipe_frontend/        # Frontend Application
+    └── recipe_frontend/    # React project source
+        ├── src/            # Components and pages
+        └── package.json    # Node dependencies
 ```
 
----
+## 🤝 Contributing
 
-## 🏆 What Makes This Integration Professional
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-- ✅ **Separation of Concerns** - Frontend and backend properly decoupled
-- ✅ **Security** - CORS configured, authentication implemented
-- ✅ **Developer Experience** - One-command startup, clear docs
-- ✅ **Error Handling** - Comprehensive error messages
-- ✅ **Monitoring** - Health checks and status dashboard
-- ✅ **Scalability** - Environment-based configuration
-- ✅ **Documentation** - Complete guides for all scenarios
-- ✅ **Testing** - Verification scripts included
-- ✅ **Maintainability** - Clean structure, clear comments
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
----
+## 📄 License
 
-## 💡 Pro Tips
-
-- 💻 Keep backend running while developing frontend
-- 🔍 Use System Status page for quick health checks
-- 📊 Check browser DevTools (F12) for API logs
-- 🔄 Backend takes ~30 seconds to start - be patient!
-- 📝 Backend logs appear in terminal where mvnw runs
-- 🎯 Use `.\test-backend.ps1` for quick backend checks
-
----
-
-## 🎊 Congratulations!
-
-Your Recipe Management System is now a fully integrated, production-ready full-stack application!
-
-**Everything is configured and ready for development and deployment.**
-
----
-
-## 📅 Integration Details
-
-**Integration Completed:** November 8, 2025  
-**Status:** ✅ **COMPLETE AND OPERATIONAL**  
-**Version:** 1.0.0  
-**Integrated By:** Senior Expert Developer
-
----
-
-## 🚀 Ready to Begin?
-
-```powershell
-# Start your fully integrated system now!
-.\start-dev.ps1
-```
-
-Then open: http://localhost:8080
-
-**Happy Coding! 🎉**
-
----
-
-**Made with ❤️ and expert craftsmanship**
-
-## Architecture diagram
-
-A visual diagram of the system architecture is included in `docs/`. Open the file or view it in your code browser:
-
-![Architecture diagram](./docs/architecture.svg)
-
-## ML Backend — local compose (focused)
-
-To run the ML backend with its required infrastructure (Redis + Kafka) for local development use the focused compose file added at `ML_Backend/docker-compose.yml`.
-
-From the repository root:
-
-```bash
-# Start the ML stack (ml-backend, redis, kafka, zookeeper)
-docker compose -f ML_Backend/docker-compose.yml up --build -d
-
-# View logs
-docker compose -f ML_Backend/docker-compose.yml logs -f ml-backend
-```
-
-Verify the ML API is responding:
-
-```bash
-curl -X POST http://localhost:8000/api/recommendations/recipes \
-  -H "Content-Type: application/json" \
-  -d '{"user_id": 42, "top_k": 8}'
-```
-
-Notes:
-
-- The compose file uses `confluentinc/cp-kafka` and `confluentinc/cp-zookeeper` images for a simple local Kafka. This is a development setup only — for production use a managed Kafka or production-hardened cluster.
-- `REDIS_URL` and `KAFKA_BOOTSTRAP_SERVERS` are set for the `ml-backend` service inside the compose file.
-
-Files added:
-
-- `docs/architecture.svg` — vector diagram for the system architecture.
-- `ML_Backend/docker-compose.yml` — focused compose file to run ML dependencies locally.
+This project is licensed under the MIT License.
