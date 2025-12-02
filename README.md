@@ -47,7 +47,7 @@ https://github.com/user-attachments/assets/6ac87e6d-c648-4809-83de-4f2e7759c954
 
 ---
 
-## 🏗 System Architecture
+## System Architecture
 
 The system follows a microservices-inspired architecture, ensuring scalability and separation of concerns.
 
@@ -124,7 +124,7 @@ graph TD
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 ### Frontend
 
@@ -311,7 +311,7 @@ The `Recipe_User_Recommendations.ipynb` notebook orchestrates the entire pipelin
 
 ---
 
-## 📡 API Documentation
+## API Documentation
 
 ### Java Backend Endpoints
 
