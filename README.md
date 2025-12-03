@@ -40,12 +40,10 @@ https://github.com/user-attachments/assets/6ac87e6d-c648-4809-83de-4f2e7759c954
 - [Contributing](#contributing)
 
 ## 🔭 Overview
-<a name="overview"></a>
 
 **RecipeShare** is a modern web application designed to transform how users discover and share culinary experiences. It integrates a robust **Java Spring Boot** backend for core business logic, a **Python FastAPI** service for machine learning-based personalized recommendations, and a responsive **React** frontend for an engaging user experience.
 
 ## 🏗 System Architecture
-<a name="system-architecture"></a>
 
 The system follows a microservices-inspired architecture, ensuring scalability and separation of concerns.
 
@@ -110,7 +108,6 @@ graph TD
 - **Elasticsearch**: Powers advanced search capabilities for recipes and ingredients.
 
 ## ✨ Key Features
-<a name="key-features"></a>
 
 - **User Management**: Secure registration, authentication, and detailed user profiles.
 - **Recipe Management**: Create, edit, and delete recipes with support for rich media (images/videos).
@@ -120,7 +117,6 @@ graph TD
 - **Activity Feed**: Stay updated with the latest creations from users you follow.
 
 ## 🛠 Tech Stack
-<a name="tech-stack"></a>
 
 ### Frontend
 
@@ -148,7 +144,6 @@ graph TD
 - **Build Tool**: Pip
 
 ## 📦 Prerequisites
-<a name="prerequisites"></a>
 
 Ensure you have the following installed:
 
@@ -158,10 +153,8 @@ Ensure you have the following installed:
 - **Python 3.10+** (For running the ML Backend)
 
 ## 🚀 Getting Started
-<a name="getting-started"></a>
 
 ### 1. Infrastructure Setup
-<a name="infrastructure-setup"></a>
 
 Start the required infrastructure services (Postgres, Kafka, Redis, Elasticsearch) using Docker Compose.
 
@@ -173,7 +166,6 @@ docker-compose up -d
 _Note: This starts the infrastructure containers only. The application services must be run separately._
 
 ### 2. Backend Setup (Java)
-<a name="backend-setup"></a>
 
 Navigate to the `javaBackend` directory and start the Spring Boot application.
 
@@ -187,7 +179,6 @@ cd javaBackend
 - **API Base URL**: `http://localhost:8090/api`
 
 ### 3. ML Backend Setup (Python)
-<a name="ml-backend-setup"></a>
 
 Navigate to the `ML_Backend` directory and start the FastAPI service.
 
@@ -214,7 +205,6 @@ uvicorn api.main:app --reload --port 8000
 - **API Base URL**: `http://localhost:8000`
 
 ### 4. Frontend Setup (React)
-<a name="frontend-setup"></a>
 
 Navigate to the `Recipe_frontend/recipe_frontend` directory and start the development server.
 
@@ -230,8 +220,7 @@ pnpm run dev
 
 - **App URL**: `http://localhost:5173` (or as configured in console)
 
-## 🧠 Model Training
-<a name="model-training"></a>
+## 🧠 Model Training & AI Architecture
 
 The recommendation engine is the core of RecipeShare's personalized experience. We employ a hybrid approach combining **Collaborative Filtering** and **Deep Learning** to deliver accurate, diverse, and socially relevant recommendations.
 
@@ -309,7 +298,6 @@ The `Recipe_User_Recommendations.ipynb` notebook orchestrates the entire pipelin
 5.  **Artifact Management:** Saving trained models (`.pkl`, `.pth`) and results to Google Drive for deployment.
 
 ## 📡 API Documentation
-<a name="api-documentation"></a>
 
 ### Java Backend Endpoints
 
@@ -327,7 +315,6 @@ The `Recipe_User_Recommendations.ipynb` notebook orchestrates the entire pipelin
 _For detailed API documentation, refer to the Swagger UI at `http://localhost:8090/swagger-ui.html` (when backend is running)._
 
 ## 📂 Project Structure
-<a name="project-structure"></a>
 
 ```
 Recipe_Management_System/
@@ -349,7 +336,6 @@ Recipe_Management_System/
 ```
 
 ## 🤝 Contributing
-<a name="contributing"></a>
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
