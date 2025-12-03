@@ -43,7 +43,9 @@ https://github.com/user-attachments/assets/6ac87e6d-c648-4809-83de-4f2e7759c954
 
 **RecipeShare** is a modern web application designed to transform how users discover and share culinary experiences. It integrates a robust **Java Spring Boot** backend for core business logic, a **Python FastAPI** service for machine learning-based personalized recommendations, and a responsive **React** frontend for an engaging user experience.
 
-## 🏗 System Architecture
+---
+
+## System Architecture
 
 The system follows a microservices-inspired architecture, ensuring scalability and separation of concerns.
 
@@ -116,7 +118,9 @@ graph TD
 - **Advanced Search**: Find recipes by ingredients, tags, cooking time, or name.
 - **Activity Feed**: Stay updated with the latest creations from users you follow.
 
-## 🛠 Tech Stack
+---
+
+## Tech Stack
 
 ### Frontend
 
@@ -297,7 +301,9 @@ The `Recipe_User_Recommendations.ipynb` notebook orchestrates the entire pipelin
 4.  **Visualization:** Generating plots for Loss curves and Metric comparisons (Validation vs. Test).
 5.  **Artifact Management:** Saving trained models (`.pkl`, `.pth`) and results to Google Drive for deployment.
 
-## 📡 API Documentation
+---
+
+## API Documentation
 
 ### Java Backend Endpoints
 
